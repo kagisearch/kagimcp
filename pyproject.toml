@@ -1,7 +1,7 @@
 [project]
 name = "kagi"
 version = "0.1.0"
-description = "Add your description here"
+description = "Kagi MCP server"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [

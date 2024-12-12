@@ -1,8 +1,10 @@
-import logging
 import asyncio
-from kagiapi import KagiClient
+import logging
+import textwrap
+from concurrent.futures import ThreadPoolExecutor
 
 import mcp.types as types
+from kagiapi import KagiClient
 from mcp.server import Server, stdio_server
 from pydantic import BaseModel, Field
 
@@ -29,9 +31,11 @@ class ToolModel(BaseModel):
 
 
 class Search(ToolModel):
-    """Perform web search based on query provided."""
+    """Perform web search based on one or more queries. Results are from all queries given. They are numbered continuously, so that a user may be able to refer to a result by a specific number."""
 
-    query: str = Field(description="query term")
+    queries: list[str] = Field(
+        description="One or more concise, keyword-focused search queries. Include essential context within each query for standalone use."
+    )
 
 
 @server.list_tools()
@@ -53,36 +57,73 @@ async def handle_call_tool(
     logger.info(f"Tool called: {name} with arguments: {arguments}")
     try:
         if name == "Search":
-            query = arguments.get("query") if arguments else None
-            if not query:
-                raise ValueError("Search called with no query")
-            results = kagi_client.search(query, limit=10)
-            return [types.TextContent(type="text", text=format_search_results(results))]
+            queries = arguments.get("queries") if arguments else None
+            if not queries:
+                raise ValueError("Search called with no queries.")
 
-        else:
-            raise ValueError(f"Unknown tool: {name}")
+            with ThreadPoolExecutor() as executor:
+                results = list(executor.map(kagi_client.search, queries, timeout=10))
 
+            return [
+                types.TextContent(
+                    type="text", text=format_search_results(queries, results)
+                )
+            ]
+
+        raise ValueError(f"Unknown tool: {name}")
     except Exception as e:
         return [types.TextContent(type="text", text=f"Error: {str(e)}")]
 
 
-def format_search_results(results):
-    output = []
+def format_search_results(queries: list[str], responses) -> str:
+    """Formatting of results for response. Need to consider both LLM and human parsing."""
 
-    for result in results["data"]:
-        # Format each result
-        if result["t"] == 0:
-            result_str = f"""[{result['title']}]({result['url']})
-    {result['snippet'].replace('<b>', '').replace('</b>', '')}
+    result_template = textwrap.dedent(
+        """
+        {result_number}: {title}
+        {url}
+        Published Date: {published}
+        {snippet}
     """
-            output.append(result_str)
+    ).strip()
 
-    # Join all results with a separator
-    return "\n---\n".join(output)
+    query_response_template = textwrap.dedent(
+        """
+        -----
+        Results for search query "{query}":
+        -----
+        {formatted_search_results}
+    """
+    ).strip()
+
+    per_query_response_strs = []
+    start_index = 1
+    for query, response in zip(queries, responses):
+        results = [result for result in response["data"] if result["t"] == 0]
+
+        formatted_results_list = [
+            result_template.format(
+                result_number=result_number,
+                title=result["title"],
+                url=result["url"],
+                published=result.get("published", "Not Available"),
+                snippet=result["snippet"],
+            )
+            for result_number, result in enumerate(results, start=start_index)
+        ]
+
+        start_index += len(results)
+        formatted_results_str = "\n\n".join(formatted_results_list)
+        query_response_str = query_response_template.format(
+            query=query, formatted_search_results=formatted_results_str
+        )
+        per_query_response_strs.append(query_response_str)
+
+    return "\n\n".join(per_query_response_strs)
 
 
 async def main():
-    logger.info("Starting Spotify MCP server")
+    logger.info("Starting Kagi MCP server")
     try:
         options = server.create_initialization_options()
         async with stdio_server() as (read_stream, write_stream):
