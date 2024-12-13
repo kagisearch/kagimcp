@@ -1,4 +1,5 @@
 import logging
+import asyncio
 from kagiapi import KagiClient
 
 import mcp.types as types
@@ -7,13 +8,13 @@ from pydantic import BaseModel, Field
 
 
 def setup_logger():
-    logger = logging.getLogger("kagi_mcp")
+    logger = logging.getLogger("kagi-mcp")
     logger.info("Starting Kagi Server")
     return logger
 
 
 logger = setup_logger()
-server = Server("kagi-mcp")
+server = Server("kagi")
 kagi_client = KagiClient()
 
 
@@ -90,3 +91,7 @@ async def main():
     except Exception as e:
         logger.error(f"Server error occurred: {str(e)}", exc_info=True)
         raise
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

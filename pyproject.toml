@@ -1,0 +1,19 @@
+[project]
+name = "kagi"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.28.1",
+    "kagiapi>=0.2.1",
+    "mcp>=1.1.2",
+    "pydantic>=2.10.3",
+]
+
+[build-system]
+requires = [ "hatchling",]
+build-backend = "hatchling.build"
+
+[project.scripts]
+kagi = "kagi:main"
