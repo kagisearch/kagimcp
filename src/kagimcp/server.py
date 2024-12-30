@@ -10,13 +10,13 @@ from pydantic import BaseModel, Field
 
 
 def setup_logger():
-    logger = logging.getLogger("kagi-mcp")
+    logger = logging.getLogger("kagimcp")
     logger.info("Starting Kagi Server")
     return logger
 
 
 logger = setup_logger()
-server = Server("kagi")
+server = Server("kagimcp")
 kagi_client = KagiClient()
 
 

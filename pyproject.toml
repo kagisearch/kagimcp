@@ -1,5 +1,5 @@
 [project]
-name = "kagi"
+name = "kagimcp"
 version = "0.1.0"
 description = "Kagi MCP server"
 authors = [
@@ -23,4 +23,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.scripts]
-kagi = "kagi:main"
+kagimcp = "kagimcp:main"
