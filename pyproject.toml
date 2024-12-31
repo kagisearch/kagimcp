@@ -1,6 +1,6 @@
 [project]
 name = "kagimcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "Kagi MCP server"
 authors = [
     {name="Rehan Ali Rana", email="rehan@kagi.com"},
