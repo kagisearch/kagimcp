@@ -3,13 +3,14 @@ import logging
 import textwrap
 from concurrent.futures import ThreadPoolExecutor
 
-import mcp.types as types
 from kagiapi import KagiClient
+from mcp.types import TextContent, Tool
 from mcp.server import Server, stdio_server
 from pydantic import BaseModel, Field
 
 
 def setup_logger():
+    logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("kagimcp")
     logger.info("Starting Kagi Server")
     return logger
@@ -23,7 +24,7 @@ kagi_client = KagiClient()
 class ToolModel(BaseModel):
     @classmethod
     def as_tool(cls):
-        return types.Tool(
+        return Tool(
             name=cls.__name__,
             description=cls.__doc__,
             inputSchema=cls.model_json_schema(),
@@ -39,7 +40,7 @@ class Search(ToolModel):
 
 
 @server.list_tools()
-async def handle_list_tools() -> list[types.Tool]:
+async def handle_list_tools() -> list[Tool]:
     """List available tools."""
     logger.info("Listing available tools")
     tools = [
@@ -50,9 +51,7 @@ async def handle_list_tools() -> list[types.Tool]:
 
 
 @server.call_tool()
-async def handle_call_tool(
-    name: str, arguments: dict | None
-) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+async def handle_call_tool(name: str, arguments: dict | None) -> list[TextContent]:
     """Handle tool execution requests."""
     logger.info(f"Tool called: {name} with arguments: {arguments}")
     try:
@@ -65,14 +64,13 @@ async def handle_call_tool(
                 results = list(executor.map(kagi_client.search, queries, timeout=10))
 
             return [
-                types.TextContent(
-                    type="text", text=format_search_results(queries, results)
-                )
+                TextContent(type="text", text=format_search_results(queries, results))
             ]
 
         raise ValueError(f"Unknown tool: {name}")
     except Exception as e:
-        return [types.TextContent(type="text", text=f"Error: {str(e)}")]
+        logger.error(f"Server error occurred: {str(e) or repr(e)}", exc_info=True)
+        return [TextContent(type="text", text=f"Error: {str(e) or repr(e)}")]
 
 
 def format_search_results(queries: list[str], responses) -> str:
@@ -130,7 +128,7 @@ async def main():
             logger.info("Server initialized successfully")
             await server.run(read_stream, write_stream, options)
     except Exception as e:
-        logger.error(f"Server error occurred: {str(e)}", exc_info=True)
+        logger.error(f"Server error occurred: {str(e) or repr(e)}", exc_info=True)
         raise
 
 
