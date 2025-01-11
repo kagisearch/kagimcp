@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28.1",
     "kagiapi>=0.2.1",
-    "mcp>=1.1.2",
+    "mcp[cli]~=1.2.0",
     "pydantic>=2.10.3",
 ]
 
@@ -21,6 +21,3 @@ Issues = "https://github.com/kagisearch/kagi-mcp/issues"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[project.scripts]
-kagimcp = "kagimcp:main"
