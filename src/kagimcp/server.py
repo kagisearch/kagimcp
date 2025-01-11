@@ -79,3 +79,11 @@ def format_search_results(queries: list[str], responses) -> str:
         per_query_response_strs.append(query_response_str)
 
     return "\n\n".join(per_query_response_strs)
+
+
+def main():
+    mcp.run()
+
+
+if __name__ == "__main__":
+    main()
