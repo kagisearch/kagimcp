@@ -7,7 +7,7 @@ from pydantic import Field
 
 
 kagi_client = KagiClient()
-mcp = FastMCP("kagimcp")
+mcp = FastMCP("kagimcp", dependencies=["kagiapi", "mcp[cli]"])
 
 
 @mcp.tool()
