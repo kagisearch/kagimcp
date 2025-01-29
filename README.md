@@ -1,5 +1,7 @@
 # Kagi MCP server
 
+[![smithery badge](https://smithery.ai/badge/kagimcp)](https://smithery.ai/server/kagimcp)
+
 ## Setup Intructions
 Install uv first.
 
@@ -11,6 +13,14 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 Windows:
 ```
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+### Installing via Smithery
+
+To install Kagi for Claude Desktop automatically via [Smithery](https://smithery.ai/server/kagimcp):
+
+```bash
+npx -y @smithery/cli install kagimcp --client claude
 ```
 
 ### Setup with Claude Desktop
