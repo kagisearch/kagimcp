@@ -33,7 +33,6 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 }
 ```
 
-
 ### Installing via Smithery
 
 Alternatively, you can install Kagi for Claude Desktop automatically via [Smithery](https://smithery.ai/server/kagimcp):
@@ -45,9 +44,17 @@ npx -y @smithery/cli install kagimcp --client claude
 ### Ask Claude a question requiring search
 e.g. "Who was time's 2024 person of the year?"
 
+### Debugging
+Run:
+```bash
+npx @modelcontextprotocol/inspector uvx kagimcp
+```
+
 ## Local/Dev Setup Instructions
+
 ### Clone repo
 `git clone https://github.com/kagisearch/kagimcp.git`
+
 ### Install dependencies
 Install uv first.
 
@@ -76,6 +83,14 @@ source .venv/bin/activate # MacOS/Linux
 uv sync
 ```
 ### Setup with Claude Desktop
+
+#### Using MCP CLI SDK
+```bash
+# `pip install mcp[cli]` if you haven't
+mcp install /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp/src/kagimcp/server.py -v "KAGI_API_KEY=API_KEY_HERE"
+```
+
+#### Manually
 ```json
 # claude_desktop_config.json
 # Can find location through:
@@ -102,6 +117,10 @@ e.g. "Who was time's 2024 person of the year?"
 ### Debugging
 Run:
 ```bash
+# If mcp cli installed (`pip install mcp[cli]`)
+mcp dev /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp/src/kagimcp/server.py
+
+# If not
 npx @modelcontextprotocol/inspector \
       uv \
       --directory /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp \
