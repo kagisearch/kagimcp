@@ -15,14 +15,6 @@ Windows:
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-### Installing via Smithery
-
-To install Kagi for Claude Desktop automatically via [Smithery](https://smithery.ai/server/kagimcp):
-
-```bash
-npx -y @smithery/cli install kagimcp --client claude
-```
-
 ### Setup with Claude Desktop
 ```json
 # claude_desktop_config.json
@@ -40,6 +32,16 @@ npx -y @smithery/cli install kagimcp --client claude
   }
 }
 ```
+
+
+### Installing via Smithery
+
+Alternatively, you can install Kagi for Claude Desktop automatically via [Smithery](https://smithery.ai/server/kagimcp):
+
+```bash
+npx -y @smithery/cli install kagimcp --client claude
+```
+
 ### Ask Claude a question requiring search
 e.g. "Who was time's 2024 person of the year?"
 
