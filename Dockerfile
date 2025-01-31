@@ -21,18 +21,24 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-editable
 
 # Create the final image
-FROM python:3.12-slim-bookworm
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
 
 WORKDIR /app
- 
-COPY --from=uv /root/.local /root/.local
+
+# Copy the virtual environment directly
 COPY --from=uv --chown=app:app /app/.venv /app/.venv
+
+# Create app user
+RUN useradd -m app
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Environment variable for the Kagi API key
 ENV KAGI_API_KEY=YOUR_API_KEY_HERE
+
+# Switch to non-root user
+USER app
 
 # Run the MCP server
 ENTRYPOINT ["uv", "run", "kagimcp"]
