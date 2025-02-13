@@ -3,6 +3,8 @@
 [![smithery badge](https://smithery.ai/badge/kagimcp)](https://smithery.ai/server/kagimcp)
 
 ## Setup Intructions
+> Before anything, ensure you have access to the search API. It is currently in closed beta and available upon request. Please reach out to support@kagi.com for an invite.
+
 Install uv first.
 
 MacOS/Linux:
