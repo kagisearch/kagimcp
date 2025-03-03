@@ -130,3 +130,7 @@ npx @modelcontextprotocol/inspector \
       kagimcp
 ```
 Then access MCP Inspector at `http://localhost:5173`. You may need to add your Kagi API key in the environment variables in the inspector under `KAGI_API_KEY`.
+
+# Notes
+- Level of logging is adjustable through the `FASTMCP_LOG_LEVEL` environment variable (e.g. `FASTMCP_LOG_LEVEL="ERROR"`)
+  - Relevant issue: https://github.com/kagisearch/kagimcp/issues/4
