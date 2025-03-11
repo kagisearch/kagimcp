@@ -2,6 +2,10 @@
 
 [![smithery badge](https://smithery.ai/badge/kagimcp)](https://smithery.ai/server/kagimcp)
 
+<a href="https://glama.ai/mcp/servers/xabrrs4bka">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/xabrrs4bka/badge" alt="Kagi Server MCP server" />
+</a>
+
 ## Setup Intructions
 > Before anything, ensure you have access to the search API. It is currently in closed beta and available upon request. Please reach out to support@kagi.com for an invite.
 
