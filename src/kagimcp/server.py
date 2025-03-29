@@ -11,12 +11,12 @@ mcp = FastMCP("kagimcp", dependencies=["kagiapi", "mcp[cli]"])
 
 
 @mcp.tool()
-def search(
+def kagi_search_fetch(
     queries: list[str] = Field(
         description="One or more concise, keyword-focused search queries. Include essential context within each query for standalone use."
     ),
 ) -> str:
-    """Perform web search based on one or more queries. Results are from all queries given. They are numbered continuously, so that a user may be able to refer to a result by a specific number."""
+    """Fetch web results based on one or more queries using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are from all queries given. They are numbered continuously, so that a user may be able to refer to a result by a specific number."""
     try:
         if not queries:
             raise ValueError("Search called with no queries.")
