@@ -1,4 +1,5 @@
 import textwrap
+from typing import Literal
 from concurrent.futures import ThreadPoolExecutor
 
 from kagiapi import KagiClient
@@ -79,6 +80,36 @@ def format_search_results(queries: list[str], responses) -> str:
         per_query_response_strs.append(query_response_str)
 
     return "\n\n".join(per_query_response_strs)
+
+
+@mcp.tool()
+def kagi_summarizer(
+    url: str = Field(description="A URL to a document to summarize."),
+    summary_type: Literal["summary", "takeaway"] = Field(
+        default="summary",
+        description="Type of summary to produce. Options are 'summary' for paragraph prose and 'takeaway' for a bulleted list of key points.",
+    ),
+    target_language: str | None = Field(
+        default=None,
+        description="Desired output language using language codes (e.g., 'EN' for English). If not specified, the document's original language influences the output.",
+    ),
+) -> str:
+    """Summarize content from a URL using the Kagi Summarizer API. The Summarizer can summarize any document type (text webpage, video, audio, etc.)"""
+    try:
+        if not url:
+            raise ValueError("Summarizer called with no URL.")
+
+        summary = kagi_client.summarize(
+            url,
+            engine="cecil",
+            summary_type=summary_type,
+            target_language=target_language,
+        )["data"]["output"]
+
+        return summary
+
+    except Exception as e:
+        return f"Error: {str(e) or repr(e)}"
 
 
 def main():
