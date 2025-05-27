@@ -39,7 +39,7 @@ npx -y @smithery/cli install kagimcp --client claude
       "command": "uvx",
       "args": ["kagimcp"],
       "env": {
-        "KAGI_API_KEY": "YOUR_API_KEY_HERE"
+        "KAGI_API_KEY": "YOUR_API_KEY_HERE",
         "KAGI_SUMMARIZER_ENGINE": "YOUR_ENGINE_CHOICE_HERE" // Defaults to "cecil" engine if env var not present
       }
     }
@@ -112,7 +112,7 @@ mcp install /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp/src/kagimcp/server.py -v "KA
         "kagimcp"
       ],
       "env": {
-        "KAGI_API_KEY": "YOUR_API_KEY_HERE"
+        "KAGI_API_KEY": "YOUR_API_KEY_HERE",
         "KAGI_SUMMARIZER_ENGINE": "YOUR_ENGINE_CHOICE_HERE" // Defaults to "cecil" engine if env var not present
       }
     }
