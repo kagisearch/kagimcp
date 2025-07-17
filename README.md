@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/mseep-audited.png)](https://mseep.ai/app/kagisearch-kagimcp)
+
 # Kagi MCP server
 
 [![smithery badge](https://smithery.ai/badge/kagimcp)](https://smithery.ai/server/kagimcp)
