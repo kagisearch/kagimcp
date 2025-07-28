@@ -28,7 +28,8 @@ Alternatively, you can install Kagi for Claude Desktop via [Smithery](https://sm
 npx -y @smithery/cli install kagimcp --client claude
 ```
 
-### Setup with Claude Desktop
+### Setup with Claude
+#### Claude Desktop
 ```json
 // claude_desktop_config.json
 // Can find location through:
@@ -43,6 +44,24 @@ npx -y @smithery/cli install kagimcp --client claude
         "KAGI_SUMMARIZER_ENGINE": "YOUR_ENGINE_CHOICE_HERE" // Defaults to "cecil" engine if env var not present
       }
     }
+  }
+}
+```
+#### Claude Code
+Add the Kagi mcp server with the following command (setting summarizer engine optional):
+
+```bash
+claude mcp add kagi -e KAGI_API_KEY="YOUR_API_KEY_HERE" KAGI_SUMMARIZER_ENGINE="YOUR_ENGINE_CHOICE_HERE" -- uvx kagimcp
+```
+
+Now claude code can use the Kagi mcp server. However, claude code comes with its own web search functionality by default, which may conflict with Kagi. You can disable claude's web search functionality with the following in your claude code settings file (`~/.claude/settings.json`):
+
+```json
+{
+  "permissions": {
+    "deny": [
+      "WebSearch"
+    ]
   }
 }
 ```
