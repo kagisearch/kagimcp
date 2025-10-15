@@ -28,6 +28,18 @@ Alternatively, you can install Kagi for Claude Desktop via [Smithery](https://sm
 npx -y @smithery/cli install kagimcp --client claude
 ```
 
+### Setup with OpenAI
+#### Codex CLI
+To add the Kagi mcp server to [codex cli](https://developers.openai.com/codex/cli/), you will need to use the following command:
+
+```bash
+codex mcp add kagi --env KAGI_API_KEY=<YOUR_API_KEY_HERE> -- uvx kagimcp
+```
+
+This will write out the configuration to `~/.codex/config.toml`, so if you need to update/rotate your API key, update your key there before running `codex` again.
+
+Codex CLI comes with its own built-in search (via `--search` flag), but it is disabled by default. So to deconflict between search and Kagi, just don't enable it.
+
 ### Setup with Claude
 #### Claude Desktop
 ```json
