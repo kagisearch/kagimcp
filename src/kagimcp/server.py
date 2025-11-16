@@ -4,7 +4,6 @@ from kagiapi import KagiClient
 from concurrent.futures import ThreadPoolExecutor
 import os
 import argparse
-import uvicorn
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
@@ -134,8 +133,9 @@ def kagi_summarizer(
 
 def main():
     if args.http:
-        app = mcp.streamable_http_app()
-        uvicorn.run(app, host=args.host, port=args.port)
+        mcp.settings.host = args.host
+        mcp.settings.port = args.port
+        mcp.run("streamable-http")
 
     else:
         mcp.run()  # default stdio mode
