@@ -18,6 +18,16 @@ parser.add_argument(
 parser.add_argument(
     "--port", type=int, default=8000, help="Port to listen on (default: 8000)"
 )
+parser.add_argument(
+    "--no-kagi_search_fetch",
+    action="store_true",
+    help="Disable the kagi_search_fetch tool",
+)
+parser.add_argument(
+    "--no-kagi_summarizer",
+    action="store_true",
+    help="Disable the kagi_summarizer tool",
+)
 args = parser.parse_args()
 
 kagi_client = KagiClient()
@@ -129,6 +139,14 @@ def kagi_summarizer(
 
     except Exception as e:
         return f"Error: {str(e) or repr(e)}"
+
+
+# Disable tools based on CLI arguments
+if args.no_kagi_search_fetch:
+    mcp.remove_tool("kagi_search_fetch")
+
+if args.no_kagi_summarizer:
+    mcp.remove_tool("kagi_summarizer")
 
 
 def main():
