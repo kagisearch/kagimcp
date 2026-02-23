@@ -170,6 +170,7 @@ npx @modelcontextprotocol/inspector \
 Then access MCP Inspector at `http://localhost:5173`. You may need to add your Kagi API key in the environment variables in the inspector under `KAGI_API_KEY`.
 
 # Advanced Configuration
+- **Secure API key storage:** The default setup requires your API key in plain text. For more secure alternatives (macOS Keychain, `pass`, SOPS), see the [Secure API Key Storage Guide](docs/secure-api-key-storage.md).
 - Level of logging is adjustable through the `FASTMCP_LOG_LEVEL` environment variable (e.g. `FASTMCP_LOG_LEVEL="ERROR"`)
   - Relevant issue: https://github.com/kagisearch/kagimcp/issues/4
 - Summarizer engine can be customized using the `KAGI_SUMMARIZER_ENGINE` environment variable (e.g. `KAGI_SUMMARIZER_ENGINE="daphne"`)
