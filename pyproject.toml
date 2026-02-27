@@ -6,11 +6,11 @@ authors = [
 ]
 description = "Kagi MCP server"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = "==3.12.*"
 dependencies = [
     "kagiapi~=0.2.1",
-    "mcp[cli]~=1.6.0",
-    "pydantic~=2.10.3",
+    "mcp[cli]~=1.26.0",
+    "pydantic~=2.12.5",
 ]
 
 [project.urls]
