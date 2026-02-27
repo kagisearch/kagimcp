@@ -19,17 +19,13 @@ def kagi_search_fetch(
     ),
 ) -> str:
     """Fetch web results based on one or more queries using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are from all queries given. They are numbered continuously, so that a user may be able to refer to a result by a specific number."""
-    try:
-        if not queries:
-            raise ValueError("Search called with no queries.")
+    if not queries:
+        raise ValueError("Search called with no queries.")
 
-        with ThreadPoolExecutor() as executor:
-            results = list(executor.map(kagi_client.search, queries, timeout=10))
+    with ThreadPoolExecutor() as executor:
+        results = list(executor.map(kagi_client.search, queries, timeout=10))
 
-        return format_search_results(queries, results)
-
-    except Exception as e:
-        return f"Error: {str(e) or repr(e)}"
+    return format_search_results(queries, results)
 
 
 def format_search_results(queries: list[str], responses) -> str:
@@ -96,31 +92,27 @@ def kagi_summarizer(
     ),
 ) -> str:
     """Summarize content from a URL using the Kagi Summarizer API. The Summarizer can summarize any document type (text webpage, video, audio, etc.)"""
-    try:
-        if not url:
-            raise ValueError("Summarizer called with no URL.")
+    if not url:
+        raise ValueError("Summarizer called with no URL.")
 
-        engine = os.environ.get("KAGI_SUMMARIZER_ENGINE", "cecil")
+    engine = os.environ.get("KAGI_SUMMARIZER_ENGINE", "cecil")
 
-        valid_engines = {"cecil", "agnes", "daphne", "muriel"}
-        if engine not in valid_engines:
-            raise ValueError(
-                f"Summarizer configured incorrectly, invalid summarization engine set: {engine}. Must be one of the following: {valid_engines}"
-            )
+    valid_engines = {"cecil", "agnes", "daphne", "muriel"}
+    if engine not in valid_engines:
+        raise ValueError(
+            f"Summarizer configured incorrectly, invalid summarization engine set: {engine}. Must be one of the following: {valid_engines}"
+        )
 
-        engine = cast(Literal["cecil", "agnes", "daphne", "muriel"], engine)
+    engine = cast(Literal["cecil", "agnes", "daphne", "muriel"], engine)
 
-        summary = kagi_client.summarize(
-            url,
-            engine=engine,
-            summary_type=summary_type,
-            target_language=target_language,
-        )["data"]["output"]
+    summary = kagi_client.summarize(
+        url,
+        engine=engine,
+        summary_type=summary_type,
+        target_language=target_language,
+    )["data"]["output"]
 
-        return summary
-
-    except Exception as e:
-        return f"Error: {str(e) or repr(e)}"
+    return summary
 
 
 def main():
