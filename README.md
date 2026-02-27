@@ -1,7 +1,5 @@
 # Kagi MCP server
 
-[![smithery badge](https://smithery.ai/badge/kagimcp)](https://smithery.ai/server/kagimcp)
-
 <a href="https://glama.ai/mcp/servers/xabrrs4bka">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/xabrrs4bka/badge" alt="Kagi Server MCP server" />
 </a>
