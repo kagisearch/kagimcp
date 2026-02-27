@@ -4,6 +4,7 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 
 from kagiapi import KagiClient
+from kagiapi.models import SearchResponse
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
@@ -28,7 +29,7 @@ def kagi_search_fetch(
     return format_search_results(queries, results)
 
 
-def format_search_results(queries: list[str], responses) -> str:
+def format_search_results(queries: list[str], responses: list[SearchResponse]) -> str:
     """Formatting of results for response. Need to consider both LLM and human parsing."""
 
     result_template = textwrap.dedent(
@@ -54,16 +55,24 @@ def format_search_results(queries: list[str], responses) -> str:
     start_index = 1
     for query, response in zip(queries, responses):
         # t == 0 is search result, t == 1 is related searches
+        if error := response.get("error"):
+            per_query_response_strs.append(
+                query_response_template.format(
+                    query=query, formatted_search_results=f"ERROR: {error}"
+                )
+            )
+            continue
         results = [result for result in response["data"] if result["t"] == 0]
 
         # published date is not always present
+        not_available_str = "Not Available"
         formatted_results_list = [
             result_template.format(
                 result_number=result_number,
-                title=result["title"],
-                url=result["url"],
-                published=result.get("published", "Not Available"),
-                snippet=result["snippet"],
+                title=result.get("title", not_available_str),
+                url=result.get("url", not_available_str),
+                published=result.get("published", not_available_str),
+                snippet=result.get("snippet", not_available_str),
             )
             for result_number, result in enumerate(results, start=start_index)
         ]
@@ -105,12 +114,15 @@ def kagi_summarizer(
 
     engine = cast(Literal["cecil", "agnes", "daphne", "muriel"], engine)
 
-    summary = kagi_client.summarize(
+    response = kagi_client.summarize(
         url,
         engine=engine,
         summary_type=summary_type,
         target_language=target_language,
-    )["data"]["output"]
+    )
+    summary = response["data"]["output"]
+    if error := response.get("error"):
+        raise ValueError(error)
 
     return summary
 
