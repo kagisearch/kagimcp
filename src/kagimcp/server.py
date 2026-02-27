@@ -23,8 +23,13 @@ def kagi_search_fetch(
     if not queries:
         raise ValueError("Search called with no queries.")
 
-    with ThreadPoolExecutor() as executor:
-        results = list(executor.map(kagi_client.search, queries, timeout=10))
+    try:
+        with ThreadPoolExecutor() as executor:
+            results = list(executor.map(kagi_client.search, queries, timeout=10))
+    except Exception as e:
+        raise ValueError(
+            f"Error calling Kagi Search API (Currently in beta, make sure you have been granted access. Can be granted by emailing support@kagi.com): {e}"
+        )
 
     return format_search_results(queries, results)
 
