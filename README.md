@@ -78,6 +78,10 @@ claude mcp add kagi -e KAGI_API_KEY="YOUR_API_KEY_HERE" -- uvx kagimcp
 npx -y @smithery/cli install kagimcp --client claude
 ```
 
+### Kiro
+
+Add to your Kiro MCP config file (`~/.kiro/settings/mcp.json` for global, or `.kiro/settings/mcp.json` for project-scoped) using the same `mcpServers` JSON as [Claude Desktop](#claude-desktop). See the [Kiro MCP documentation](https://kiro.dev/docs/mcp/) for more details.
+
 ## Usage Examples
 
 - Search: `Who was Time's 2024 person of the year?`
