@@ -8,14 +8,18 @@ description = "Kagi MCP server"
 readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
-    "kagiapi~=0.2.1",
+    "openapi_client @ git+https://github.com/kagisearch/kagi-api-python.git",
     "mcp[cli]~=1.26.0",
     "pydantic~=2.12.5",
+    "httpx~=0.28",
 ]
 
 [project.urls]
 Homepage = "https://github.com/kagisearch/kagi-mcp"
 Issues = "https://github.com/kagisearch/kagi-mcp/issues"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [build-system]
 requires = ["hatchling"]
