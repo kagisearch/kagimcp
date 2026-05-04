@@ -1,7 +1,6 @@
 import textwrap
 from typing import Literal, cast
 import os
-from concurrent.futures import ThreadPoolExecutor
 import argparse
 
 import httpx
@@ -29,34 +28,27 @@ search_api = SearchApi(_api_client)
 mcp = FastMCP("kagimcp", dependencies=["openapi_client", "httpx", "mcp[cli]"])
 
 
-def _do_search(query: str) -> Search200Response:
-    return search_api.search(SearchRequest(query=query, limit=10))
-
-
 @mcp.tool()
 def kagi_search_fetch(
-    queries: list[str] = Field(
-        description="One or more concise, keyword-focused search queries. Include essential context within each query for standalone use."
+    query: str = Field(
+        description="A concise, keyword-focused search query. Include essential context for standalone use."
     ),
 ) -> str:
-    """Fetch web results based on one or more queries using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are from all queries given. They are numbered continuously, so that a user may be able to refer to a result by a specific number."""
-    if not queries:
-        raise ValueError("Search called with no queries.")
+    """Fetch web results for a query using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are numbered so that a user may refer to a result by a specific number."""
+    if not query:
+        raise ValueError("Search called with no query.")
 
     try:
-        with ThreadPoolExecutor() as executor:
-            results = list(executor.map(_do_search, queries, timeout=10))
+        response = search_api.search(SearchRequest(query=query, limit=10))
     except Exception as e:
         raise ValueError(
             f"Error calling Kagi Search API (Currently in beta, make sure you have been granted access. Can be granted by emailing support@kagi.com): {e}"
         )
 
-    return format_search_results(queries, results)
+    return format_search_results(query, response)
 
 
-def format_search_results(
-    queries: list[str], responses: list[Search200Response]
-) -> str:
+def format_search_results(query: str, response: Search200Response) -> str:
     """Formatting of results for response. Need to consider both LLM and human parsing."""
 
     result_template = textwrap.dedent(
@@ -78,32 +70,23 @@ def format_search_results(
     ).strip()
 
     not_available_str = "Not Available"
-    per_query_response_strs = []
+    results = (response.data.search if response.data else None) or []
 
-    start_index = 1
-    for query, response in zip(queries, responses):
-        results = (response.data.search if response.data else None) or []
-
-        formatted_results_list = [
-            result_template.format(
-                result_number=result_number,
-                title=result.title or not_available_str,
-                url=result.url or not_available_str,
-                published=result.time or not_available_str,
-                snippet=result.snippet or not_available_str,
-            )
-            for result_number, result in enumerate(results, start=start_index)
-        ]
-
-        start_index += len(results)
-
-        formatted_results_str = "\n\n".join(formatted_results_list)
-        query_response_str = query_response_template.format(
-            query=query, formatted_search_results=formatted_results_str
+    formatted_results_list = [
+        result_template.format(
+            result_number=result_number,
+            title=result.title or not_available_str,
+            url=result.url or not_available_str,
+            published=result.time or not_available_str,
+            snippet=result.snippet or not_available_str,
         )
-        per_query_response_strs.append(query_response_str)
+        for result_number, result in enumerate(results, start=1)
+    ]
 
-    return "\n\n".join(per_query_response_strs)
+    return query_response_template.format(
+        query=query,
+        formatted_search_results="\n\n".join(formatted_results_list),
+    )
 
 
 @mcp.tool()
