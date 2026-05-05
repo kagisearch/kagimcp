@@ -119,10 +119,10 @@ uv sync
 ```
 ### Setup with Claude Desktop
 
-#### Using MCP CLI SDK
+#### Using FastMCP CLI
 ```bash
-# `pip install mcp[cli]` if you haven't
-mcp install /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp/src/kagimcp/server.py -v "KAGI_API_KEY=API_KEY_HERE"
+# `pip install fastmcp` if you haven't
+fastmcp install claude-desktop /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp/src/kagimcp/server.py --env KAGI_API_KEY=API_KEY_HERE
 ```
 
 #### Manually
@@ -155,8 +155,8 @@ e.g. "Who was time's 2024 person of the year?" for search, or "summarize this vi
 ### Debugging
 Run:
 ```bash
-# If mcp cli installed (`pip install mcp[cli]`)
-mcp dev /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp/src/kagimcp/server.py
+# If fastmcp installed (`pip install fastmcp`)
+fastmcp dev inspector /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp/src/kagimcp/server.py
 
 # If not
 npx @modelcontextprotocol/inspector \
