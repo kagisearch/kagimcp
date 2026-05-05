@@ -172,6 +172,10 @@ Then access MCP Inspector at `http://localhost:5173`. You may need to add your K
   - Relevant issue: https://github.com/kagisearch/kagimcp/issues/4
 - Summarizer engine can be customized using the `KAGI_SUMMARIZER_ENGINE` environment variable (e.g. `KAGI_SUMMARIZER_ENGINE="daphne"`)
   - Learn about the different summarization engines [here](https://help.kagi.com/kagi/api/summarizer.html#summarization-engines)
+- Per-tool request timeouts (in seconds) can be set via environment variables. Defaults are tuned for typical latency of each endpoint:
+  - `KAGI_SEARCH_TIMEOUT` — search requests (default: `10`)
+  - `KAGI_EXTRACT_TIMEOUT` — page extraction (default: `30`)
+  - `KAGI_SUMMARIZER_TIMEOUT` — summarization, which can be slow on long videos/docs (default: `60`)
 - Tool parameters can be hidden from the LLM via the `KAGI_HIDDEN_PARAMS` environment variable (comma-separated list). Hidden params fall back to their defaults, reducing context-window noise when you don't need fine-grained control.
   - Hideable params: `workflow`, `extract_count`, `limit`, `include_domains`, `exclude_domains`, `time_relative`, `after`, `before`, `file_type` (search).
   - Example: `KAGI_HIDDEN_PARAMS="extract_count,after,before,time_relative,include_domains,exclude_domains"` trims the search tool down to `query`, `workflow`, `limit`.
