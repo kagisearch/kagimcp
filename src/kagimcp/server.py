@@ -19,6 +19,8 @@ from openapi_client import (
 )
 from openapi_client.exceptions import ApiException
 from fastmcp import FastMCP
+from fastmcp.server.transforms.tool_transform import ToolTransform
+from fastmcp.tools.tool_transform import ArgTransformConfig, ToolTransformConfig
 from pydantic import Field
 
 _api_key = os.environ.get("KAGI_API_KEY")
@@ -37,6 +39,51 @@ mcp = FastMCP("kagimcp")
 
 
 _TRACE_HEADER = "x-kagi-trace"
+
+# Per-tool sets of params that may be hidden from the LLM-facing schema via the
+# KAGI_HIDDEN_PARAMS env var. Required params (query, url) are intentionally
+# omitted — hiding them would break the tool. Hidden params fall back to their
+# function-level defaults.
+_HIDEABLE_PARAMS: dict[str, set[str]] = {
+    "kagi_search_fetch": {
+        "workflow",
+        "extract_count",
+        "limit",
+        "include_domains",
+        "exclude_domains",
+        "time_relative",
+        "after",
+        "before",
+    },
+}
+
+
+def _apply_hidden_params() -> None:
+    raw = os.environ.get("KAGI_HIDDEN_PARAMS", "").strip()
+    if not raw:
+        return
+
+    requested = {name.strip() for name in raw.split(",") if name.strip()}
+    all_hideable = {param for params in _HIDEABLE_PARAMS.values() for param in params}
+
+    if unknown := requested - all_hideable:
+        raise ValueError(
+            f"KAGI_HIDDEN_PARAMS contains unknown or non-hideable param(s): "
+            f"{sorted(unknown)}. Hideable params: {sorted(all_hideable)}."
+        )
+
+    transforms: dict[str, ToolTransformConfig] = {}
+    for tool_name, hideable in _HIDEABLE_PARAMS.items():
+        if to_hide := requested & hideable:
+            transforms[tool_name] = ToolTransformConfig(
+                arguments={name: ArgTransformConfig(hide=True) for name in to_hide}
+            )
+
+    if transforms:
+        mcp.add_transform(ToolTransform(transforms))
+
+
+_apply_hidden_params()
 
 
 def _trace_suffix(headers: Any) -> str:
@@ -125,9 +172,7 @@ def kagi_search_fetch(
     )
 
     filters = (
-        SearchRequestFilters(after=after, before=before)
-        if after or before
-        else None
+        SearchRequestFilters(after=after, before=before) if after or before else None
     )
 
     try:
