@@ -54,6 +54,7 @@ _HIDEABLE_PARAMS: dict[str, set[str]] = {
         "time_relative",
         "after",
         "before",
+        "file_type",
     },
 }
 
@@ -150,6 +151,10 @@ def kagi_search_fetch(
         default=None,
         description="Only include results published/updated on or before this date (ISO format, e.g., '2024-12-31').",
     ),
+    file_type: str | None = Field(
+        default=None,
+        description="Restrict to results with this file type (e.g., 'pdf', 'docx', 'xlsx'). Specify the extension without a leading dot.",
+    ),
 ) -> str:
     """Fetch web results for a query using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are numbered so that a user may refer to a result by a specific number."""
     if not query:
@@ -164,6 +169,7 @@ def kagi_search_fetch(
         "sites_included": include_domains or None,
         "sites_excluded": exclude_domains or None,
         "time_relative": time_relative,
+        "file_type": file_type,
     }
     lens = (
         SearchRequestLens(**lens_fields)
