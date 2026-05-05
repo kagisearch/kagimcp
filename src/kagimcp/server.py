@@ -1,4 +1,3 @@
-import textwrap
 from typing import Literal, cast
 import os
 import argparse
@@ -10,7 +9,6 @@ from openapi_client import (
     ExtractApi,
     ExtractRequest,
     PageInput,
-    Search200Response,
     SearchApi,
     SearchRequest,
 )
@@ -43,54 +41,15 @@ def kagi_search_fetch(
         raise ValueError("Search called with no query.")
 
     try:
-        response = search_api.search(SearchRequest(query=query, limit=10))
+        response = search_api.search_without_preload_content(
+            SearchRequest(query=query, format="markdown", limit=10)
+        )
     except Exception as e:
         raise ValueError(
             f"Error calling Kagi Search API (Currently in beta, make sure you have been granted access. Can be granted by emailing support@kagi.com): {e}"
         )
 
-    return format_search_results(query, response)
-
-
-def format_search_results(query: str, response: Search200Response) -> str:
-    """Formatting of results for response. Need to consider both LLM and human parsing."""
-
-    result_template = textwrap.dedent(
-        """
-        {result_number}: {title}
-        {url}
-        Published Date: {published}
-        {snippet}
-    """
-    ).strip()
-
-    query_response_template = textwrap.dedent(
-        """
-        -----
-        Results for search query "{query}":
-        -----
-        {formatted_search_results}
-    """
-    ).strip()
-
-    not_available_str = "Not Available"
-    results = (response.data.search if response.data else None) or []
-
-    formatted_results_list = [
-        result_template.format(
-            result_number=result_number,
-            title=result.title or not_available_str,
-            url=result.url or not_available_str,
-            published=result.time or not_available_str,
-            snippet=result.snippet or not_available_str,
-        )
-        for result_number, result in enumerate(results, start=1)
-    ]
-
-    return query_response_template.format(
-        query=query,
-        formatted_search_results="\n\n".join(formatted_results_list),
-    )
+    return response.data.decode("utf-8")
 
 
 @mcp.tool()
