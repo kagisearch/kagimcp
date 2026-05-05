@@ -7,6 +7,9 @@ import httpx
 from openapi_client import (
     ApiClient,
     Configuration,
+    ExtractApi,
+    ExtractRequest,
+    PageInput,
     Search200Response,
     SearchApi,
     SearchRequest,
@@ -24,6 +27,7 @@ _V0_BASE_URL = "https://kagi.com/api/v0"
 
 _api_client = ApiClient(Configuration(access_token=_api_key))
 search_api = SearchApi(_api_client)
+extract_api = ExtractApi(_api_client)
 
 mcp = FastMCP("kagimcp", dependencies=["openapi_client", "httpx", "mcp[cli]"])
 
@@ -142,6 +146,29 @@ def kagi_summarizer(
     if not output:
         raise ValueError("Kagi Summarizer API returned no output.")
     return output
+
+
+@mcp.tool()
+def kagi_extract(
+    url: str = Field(description="The HTTPS URL of the page to extract content from."),
+) -> str:
+    """Extract the content of a web page as markdown using the Kagi Extract API. Use this to read the full content of a page when needed."""
+    if not url:
+        raise ValueError("Extract called with no URL.")
+
+    try:
+        response = extract_api.extract_content(
+            ExtractRequest(pages=[PageInput(url=url)], format="markdown")
+        )
+    except Exception as e:
+        raise ValueError(f"Error calling Kagi Extract API: {e}")
+
+    if not (pages := response.data) or not pages[0].markdown:
+        if errors := response.errors:
+            raise ValueError(f"Kagi Extract API error: {errors}")
+        raise ValueError("Kagi Extract API returned no content.")
+
+    return pages[0].markdown
 
 
 def main():
