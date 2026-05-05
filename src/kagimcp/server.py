@@ -66,13 +66,19 @@ def kagi_search_fetch(
     ),
     workflow: Literal["search", "news", "videos", "podcasts", "images"] = Field(
         default="search",
-        description="Type of results to return. Use 'news' for current events and recent reporting, 'videos' for video content (e.g. tutorials, talks), 'podcasts' for audio shows, 'images' for image results, or the default 'search' for general web results.",
+        description="Type of results to return. Use 'news' for current events and recent reporting, 'videos' for video content (e.g. tutorials, talks), 'podcasts' for audio shows, 'images' for image results, or the default 'search' for general web results. Note that 'search' may return a mix of categories (web, news, videos, images) in one response, like a typical SERP; the other workflows return only their single category.",
     ),
     extract_count: int = Field(
         default=0,
         ge=0,
         le=10,
-        description="Number of top results to fetch full page content for, inline as markdown. Defaults to 0 (snippets only).",
+        description="Number of top results to fetch full page content for, inline as markdown.",
+    ),
+    limit: int = Field(
+        default=10,
+        ge=1,
+        le=1024,
+        description="Maximum number of results per category. In the mixed 'search' workflow this caps each category independently, so the total can exceed this number; in single-category workflows it caps total results.",
     ),
 ) -> str:
     """Fetch web results for a query using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are numbered so that a user may refer to a result by a specific number."""
@@ -87,7 +93,7 @@ def kagi_search_fetch(
                 query=query,
                 workflow=workflow,
                 format="markdown",
-                limit=10,
+                limit=limit,
                 extract=extract,
             )
         )
