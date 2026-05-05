@@ -5,6 +5,13 @@ import os
 import argparse
 
 import httpx
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
+from urllib3.util.retry import Retry
 from openapi_client import (
     ApiClient,
     Configuration,
@@ -49,9 +56,52 @@ _SEARCH_TIMEOUT = _timeout_from_env("KAGI_SEARCH_TIMEOUT", 10.0)
 _EXTRACT_TIMEOUT = _timeout_from_env("KAGI_EXTRACT_TIMEOUT", 30.0)
 _SUMMARIZER_TIMEOUT = _timeout_from_env("KAGI_SUMMARIZER_TIMEOUT", 30.0)
 
-_api_client = ApiClient(Configuration(access_token=_api_key))
+
+def _max_retries_from_env() -> int:
+    raw = os.environ.get("KAGI_MAX_RETRIES", "").strip()
+    if not raw:
+        return 2
+    try:
+        value = int(raw)
+    except ValueError:
+        raise ValueError(f"KAGI_MAX_RETRIES must be an integer, got: {raw!r}")
+    if value < 0:
+        raise ValueError(f"KAGI_MAX_RETRIES must be >= 0, got: {value}")
+    return value
+
+
+_MAX_RETRIES = _max_retries_from_env()
+_RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+
+_config = Configuration(access_token=_api_key)
+_config.retries = Retry(
+    total=_MAX_RETRIES,
+    backoff_factor=0.5,
+    backoff_max=10.0,
+    status_forcelist=list(_RETRY_STATUSES),
+    allowed_methods=None,
+    respect_retry_after_header=True,
+    raise_on_status=False,
+)
+_api_client = ApiClient(_config)
 search_api = SearchApi(_api_client)
 extract_api = ExtractApi(_api_client)
+
+
+@retry(
+    stop=stop_after_attempt(_MAX_RETRIES + 1),
+    wait=wait_exponential_jitter(initial=0.5, max=10.0),
+    retry=retry_if_exception_type((httpx.TimeoutException, httpx.TransportError, httpx.HTTPStatusError)),
+    reraise=True,
+)
+def _httpx_get_with_retry(
+    url: str, *, params: dict[str, str], headers: dict[str, str], timeout: float
+) -> httpx.Response:
+    response = httpx.get(url, params=params, headers=headers, timeout=timeout)
+    if response.status_code in _RETRY_STATUSES:
+        response.raise_for_status()  # raises HTTPStatusError → retried
+    return response
+
 
 mcp = FastMCP("kagimcp")
 
@@ -263,7 +313,7 @@ def kagi_summarizer(
         params["target_language"] = target_language
 
     try:
-        response = httpx.get(
+        response = _httpx_get_with_retry(
             f"{_V0_BASE_URL}/summarize",
             params=params,
             headers={"Authorization": f"Bot {_api_key}"},

@@ -175,7 +175,8 @@ Then access MCP Inspector at `http://localhost:5173`. You may need to add your K
 - Per-tool request timeouts (in seconds) can be set via environment variables. Defaults are tuned for typical latency of each endpoint:
   - `KAGI_SEARCH_TIMEOUT` — search requests (default: `10`)
   - `KAGI_EXTRACT_TIMEOUT` — page extraction (default: `30`)
-  - `KAGI_SUMMARIZER_TIMEOUT` — summarization, which can be slow on long videos/docs (default: `60`)
+  - `KAGI_SUMMARIZER_TIMEOUT` — summarization, which can be slow on long videos/docs (default: `30`)
+- Transient failures (HTTP 429/500/502/503/504, connection errors, timeouts) are retried with exponential backoff + jitter. Configure max retry attempts via `KAGI_MAX_RETRIES` (default: `2`, i.e. 3 total attempts). Set to `0` to disable retries.
 - Tool parameters can be hidden from the LLM via the `KAGI_HIDDEN_PARAMS` environment variable (comma-separated list). Hidden params fall back to their defaults, reducing context-window noise when you don't need fine-grained control.
   - Hideable params: `workflow`, `extract_count`, `limit`, `include_domains`, `exclude_domains`, `time_relative`, `after`, `before`, `file_type` (search).
   - Example: `KAGI_HIDDEN_PARAMS="extract_count,after,before,time_relative,include_domains,exclude_domains"` trims the search tool down to `query`, `workflow`, `limit`.
