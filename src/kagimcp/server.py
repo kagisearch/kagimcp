@@ -35,6 +35,10 @@ def kagi_search_fetch(
     query: str = Field(
         description="A concise, keyword-focused search query. Include essential context for standalone use."
     ),
+    workflow: Literal["search", "news", "videos", "podcasts", "images"] = Field(
+        default="search",
+        description="Type of results to return. Use 'news' for current events and recent reporting, 'videos' for video content (e.g. tutorials, talks), 'podcasts' for audio shows, 'images' for image results, or the default 'search' for general web results.",
+    ),
 ) -> str:
     """Fetch web results for a query using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are numbered so that a user may refer to a result by a specific number."""
     if not query:
@@ -42,7 +46,7 @@ def kagi_search_fetch(
 
     try:
         response = search_api.search_without_preload_content(
-            SearchRequest(query=query, format="markdown", limit=10)
+            SearchRequest(query=query, workflow=workflow, format="markdown", limit=10)
         )
     except Exception as e:
         raise ValueError(
