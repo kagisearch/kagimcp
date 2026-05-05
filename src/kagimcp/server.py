@@ -1,4 +1,5 @@
 from typing import Any, Literal, cast
+from datetime import date
 import json
 import os
 import argparse
@@ -13,6 +14,7 @@ from openapi_client import (
     SearchApi,
     SearchRequest,
     SearchRequestExtract,
+    SearchRequestFilters,
     SearchRequestLens,
 )
 from openapi_client.exceptions import ApiException
@@ -89,6 +91,18 @@ def kagi_search_fetch(
         default=None,
         description="Exclude results from these domains (e.g., ['pinterest.com', 'quora.com']). Overrides any 'site:' operators in the query.",
     ),
+    time_relative: Literal["day", "week", "month"] | None = Field(
+        default=None,
+        description="Restrict to results published/updated within the last day, week, or month, evaluated server-side. Mutually exclusive with 'after'/'before'.",
+    ),
+    after: date | None = Field(
+        default=None,
+        description="Only include results published/updated on or after this date (ISO format, e.g., '2024-01-15').",
+    ),
+    before: date | None = Field(
+        default=None,
+        description="Only include results published/updated on or before this date (ISO format, e.g., '2024-12-31').",
+    ),
 ) -> str:
     """Fetch web results for a query using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are numbered so that a user may refer to a result by a specific number."""
     if not query:
@@ -96,12 +110,23 @@ def kagi_search_fetch(
 
     extract = SearchRequestExtract(count=extract_count) if extract_count > 0 else None
 
+    if time_relative and (after or before):
+        raise ValueError("'time_relative' is mutually exclusive with 'after'/'before'.")
+
+    lens_fields = {
+        "sites_included": include_domains or None,
+        "sites_excluded": exclude_domains or None,
+        "time_relative": time_relative,
+    }
     lens = (
-        SearchRequestLens(
-            sites_included=include_domains or None,
-            sites_excluded=exclude_domains or None,
-        )
-        if include_domains or exclude_domains
+        SearchRequestLens(**lens_fields)
+        if any(value is not None for value in lens_fields.values())
+        else None
+    )
+
+    filters = (
+        SearchRequestFilters(after=after, before=before)
+        if after or before
         else None
     )
 
@@ -114,6 +139,7 @@ def kagi_search_fetch(
                 limit=limit,
                 extract=extract,
                 lens=lens,
+                filters=filters,
             )
         )
     except ApiException as e:
