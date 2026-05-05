@@ -13,6 +13,7 @@ from openapi_client import (
     SearchApi,
     SearchRequest,
     SearchRequestExtract,
+    SearchRequestLens,
 )
 from openapi_client.exceptions import ApiException
 from mcp.server.fastmcp import FastMCP
@@ -80,12 +81,29 @@ def kagi_search_fetch(
         le=1024,
         description="Maximum number of results per category. In the mixed 'search' workflow this caps each category independently, so the total can exceed this number; in single-category workflows it caps total results.",
     ),
+    include_domains: list[str] | None = Field(
+        default=None,
+        description="Restrict results to these domains (e.g., ['docs.python.org', 'github.com']). Overrides any 'site:' operators in the query.",
+    ),
+    exclude_domains: list[str] | None = Field(
+        default=None,
+        description="Exclude results from these domains (e.g., ['pinterest.com', 'quora.com']). Overrides any 'site:' operators in the query.",
+    ),
 ) -> str:
     """Fetch web results for a query using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are numbered so that a user may refer to a result by a specific number."""
     if not query:
         raise ValueError("Search called with no query.")
 
     extract = SearchRequestExtract(count=extract_count) if extract_count > 0 else None
+
+    lens = (
+        SearchRequestLens(
+            sites_included=include_domains or None,
+            sites_excluded=exclude_domains or None,
+        )
+        if include_domains or exclude_domains
+        else None
+    )
 
     try:
         response = search_api.search_without_preload_content(
@@ -95,6 +113,7 @@ def kagi_search_fetch(
                 format="markdown",
                 limit=limit,
                 extract=extract,
+                lens=lens,
             )
         )
     except ApiException as e:
