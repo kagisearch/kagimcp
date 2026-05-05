@@ -1,4 +1,5 @@
-from typing import Literal, cast
+from typing import Any, Literal, cast
+import json
 import os
 import argparse
 
@@ -12,6 +13,7 @@ from openapi_client import (
     SearchApi,
     SearchRequest,
 )
+from openapi_client.exceptions import ApiException
 from mcp.server.fastmcp import FastMCP
 from pydantic import Field
 
@@ -28,6 +30,32 @@ search_api = SearchApi(_api_client)
 extract_api = ExtractApi(_api_client)
 
 mcp = FastMCP("kagimcp", dependencies=["openapi_client", "httpx", "mcp[cli]"])
+
+
+_TRACE_HEADER = "x-kagi-trace"
+
+
+def _trace_suffix(headers: Any) -> str:
+    if not headers:
+        return ""
+    try:
+        trace = headers.get(_TRACE_HEADER)
+    except AttributeError:
+        return ""
+    return f" (trace id: {trace})" if trace else ""
+
+
+def _format_error_body(body: str) -> str:
+    """
+    Pull message(s) out of a Kagi error envelope (v1 `errors[].message`, v0 `error[].msg`).
+    """
+    # TODO: unneeded when moved over to v1 endpoint completely
+    try:
+        parsed = json.loads(body)
+        errors = parsed.get("errors") or parsed.get("error") or []
+        return "; ".join(e.get("message") or e.get("msg") for e in errors) or body
+    except Exception:
+        return body
 
 
 @mcp.tool()
@@ -48,12 +76,20 @@ def kagi_search_fetch(
         response = search_api.search_without_preload_content(
             SearchRequest(query=query, workflow=workflow, format="markdown", limit=10)
         )
-    except Exception as e:
+    except ApiException as e:
         raise ValueError(
-            f"Error calling Kagi Search API (Currently in beta, make sure you have been granted access. Can be granted by emailing support@kagi.com): {e}"
+            f"Kagi Search API error ({e.status}): {_format_error_body(e.body or '')}{_trace_suffix(e.headers)}"
+        )
+    except Exception as e:
+        raise ValueError(f"Error calling Kagi Search API: {e}")
+
+    body = response.data.decode("utf-8")
+    if response.status >= 400:
+        raise ValueError(
+            f"Kagi Search API error ({response.status}): {_format_error_body(body)}{_trace_suffix(response.headers)}"
         )
 
-    return response.data.decode("utf-8")
+    return body
 
 
 @mcp.tool()
@@ -98,16 +134,22 @@ def kagi_summarizer(
             timeout=30.0,
         )
         response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise ValueError(
+            f"Kagi Summarizer API error ({e.response.status_code}): "
+            f"{_format_error_body(e.response.text)}{_trace_suffix(e.response.headers)}"
+        )
     except httpx.HTTPError as e:
         raise ValueError(f"Kagi Summarizer API error: {e}")
 
+    suffix = _trace_suffix(response.headers)
     body = response.json()
     if errors := body.get("error"):
-        raise ValueError(f"Kagi Summarizer API error: {errors}")
+        raise ValueError(f"Kagi Summarizer API error: {errors}{suffix}")
 
     output = body.get("data", {}).get("output")
     if not output:
-        raise ValueError("Kagi Summarizer API returned no output.")
+        raise ValueError(f"Kagi Summarizer API returned no output.{suffix}")
     return output
 
 
@@ -123,13 +165,20 @@ def kagi_extract(
         response = extract_api.extract_content(
             ExtractRequest(pages=[PageInput(url=url)], format="markdown")
         )
+    except ApiException as e:
+        raise ValueError(
+            f"Kagi Extract API error ({e.status}): {_format_error_body(e.body or '')}{_trace_suffix(e.headers)}"
+        )
     except Exception as e:
         raise ValueError(f"Error calling Kagi Extract API: {e}")
 
+    trace = response.meta.trace if response.meta else None
+    suffix = f" (trace id: {trace})" if trace else ""
+
     if not (pages := response.data) or not pages[0].markdown:
         if errors := response.errors:
-            raise ValueError(f"Kagi Extract API error: {errors}")
-        raise ValueError("Kagi Extract API returned no content.")
+            raise ValueError(f"Kagi Extract API error: {errors}{suffix}")
+        raise ValueError(f"Kagi Extract API returned no content.{suffix}")
 
     return pages[0].markdown
 
