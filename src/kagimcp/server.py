@@ -12,6 +12,7 @@ from openapi_client import (
     PageInput,
     SearchApi,
     SearchRequest,
+    SearchRequestExtract,
 )
 from openapi_client.exceptions import ApiException
 from mcp.server.fastmcp import FastMCP
@@ -67,14 +68,28 @@ def kagi_search_fetch(
         default="search",
         description="Type of results to return. Use 'news' for current events and recent reporting, 'videos' for video content (e.g. tutorials, talks), 'podcasts' for audio shows, 'images' for image results, or the default 'search' for general web results.",
     ),
+    extract_count: int = Field(
+        default=0,
+        ge=0,
+        le=10,
+        description="Number of top results to fetch full page content for, inline as markdown. Defaults to 0 (snippets only).",
+    ),
 ) -> str:
     """Fetch web results for a query using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are numbered so that a user may refer to a result by a specific number."""
     if not query:
         raise ValueError("Search called with no query.")
 
+    extract = SearchRequestExtract(count=extract_count) if extract_count > 0 else None
+
     try:
         response = search_api.search_without_preload_content(
-            SearchRequest(query=query, workflow=workflow, format="markdown", limit=10)
+            SearchRequest(
+                query=query,
+                workflow=workflow,
+                format="markdown",
+                limit=10,
+                extract=extract,
+            )
         )
     except ApiException as e:
         raise ValueError(
