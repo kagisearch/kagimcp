@@ -9,7 +9,7 @@ readme = "README.md"
 requires-python = "==3.12.*"
 dependencies = [
     "openapi_client @ git+https://github.com/kagisearch/kagi-api-python.git",
-    "mcp[cli]~=1.26.0",
+    "fastmcp~=3.2",
     "pydantic~=2.12.5",
     "httpx~=0.28",
 ]

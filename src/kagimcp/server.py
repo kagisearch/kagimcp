@@ -18,7 +18,7 @@ from openapi_client import (
     SearchRequestLens,
 )
 from openapi_client.exceptions import ApiException
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from pydantic import Field
 
 _api_key = os.environ.get("KAGI_API_KEY")
@@ -33,7 +33,7 @@ _api_client = ApiClient(Configuration(access_token=_api_key))
 search_api = SearchApi(_api_client)
 extract_api = ExtractApi(_api_client)
 
-mcp = FastMCP("kagimcp", dependencies=["openapi_client", "httpx", "mcp[cli]"])
+mcp = FastMCP("kagimcp")
 
 
 _TRACE_HEADER = "x-kagi-trace"
@@ -263,9 +263,7 @@ def main():
     args = parser.parse_args()
 
     if args.http:
-        mcp.settings.host = args.host
-        mcp.settings.port = args.port
-        mcp.run("streamable-http")
+        mcp.run("streamable-http", host=args.host, port=args.port)
     else:
         mcp.run()  # default stdio mode
 
