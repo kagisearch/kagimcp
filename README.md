@@ -173,7 +173,7 @@ Then access MCP Inspector at `http://localhost:5173`. You may need to add your K
 - Summarizer engine can be customized using the `KAGI_SUMMARIZER_ENGINE` environment variable (e.g. `KAGI_SUMMARIZER_ENGINE="daphne"`)
   - Learn about the different summarization engines [here](https://help.kagi.com/kagi/api/summarizer.html#summarization-engines)
 - Tool parameters can be hidden from the LLM via the `KAGI_HIDDEN_PARAMS` environment variable (comma-separated list). Hidden params fall back to their defaults, reducing context-window noise when you don't need fine-grained control.
-  - Hideable params: `workflow`, `extract_count`, `limit`, `include_domains`, `exclude_domains`, `time_relative`, `after`, `before` (search).
+  - Hideable params: `workflow`, `extract_count`, `limit`, `include_domains`, `exclude_domains`, `time_relative`, `after`, `before`, `file_type` (search).
   - Example: `KAGI_HIDDEN_PARAMS="extract_count,after,before,time_relative,include_domains,exclude_domains"` trims the search tool down to `query`, `workflow`, `limit`.
 - There may be more secure ways of plugging into the MCP. A user wrote down some details [here](https://github.com/lardinator/kagimcp/blob/main/docs/secure-api-key-storage.md)
 - The `--http` cli option can be used to toggle streamable HTTP transport on. Can use along with `--port` and `--host` args.
