@@ -31,6 +31,24 @@ if not _api_key:
 
 _V0_BASE_URL = "https://kagi.com/api/v0"
 
+
+def _timeout_from_env(name: str, default: float) -> float:
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except ValueError:
+        raise ValueError(f"{name} must be a number (seconds), got: {raw!r}")
+    if value <= 0:
+        raise ValueError(f"{name} must be > 0, got: {value}")
+    return value
+
+
+_SEARCH_TIMEOUT = _timeout_from_env("KAGI_SEARCH_TIMEOUT", 10.0)
+_EXTRACT_TIMEOUT = _timeout_from_env("KAGI_EXTRACT_TIMEOUT", 30.0)
+_SUMMARIZER_TIMEOUT = _timeout_from_env("KAGI_SUMMARIZER_TIMEOUT", 30.0)
+
 _api_client = ApiClient(Configuration(access_token=_api_key))
 search_api = SearchApi(_api_client)
 extract_api = ExtractApi(_api_client)
@@ -191,7 +209,8 @@ def kagi_search_fetch(
                 extract=extract,
                 lens=lens,
                 filters=filters,
-            )
+            ),
+            _request_timeout=_SEARCH_TIMEOUT,
         )
     except ApiException as e:
         raise ValueError(
@@ -248,7 +267,7 @@ def kagi_summarizer(
             f"{_V0_BASE_URL}/summarize",
             params=params,
             headers={"Authorization": f"Bot {_api_key}"},
-            timeout=30.0,
+            timeout=_SUMMARIZER_TIMEOUT,
         )
         response.raise_for_status()
     except httpx.HTTPStatusError as e:
@@ -280,7 +299,8 @@ def kagi_extract(
 
     try:
         response = extract_api.extract_content(
-            ExtractRequest(pages=[PageInput(url=url)], format="markdown")
+            ExtractRequest(pages=[PageInput(url=url)], format="markdown"),
+            _request_timeout=_EXTRACT_TIMEOUT,
         )
     except ApiException as e:
         raise ValueError(
