@@ -290,7 +290,7 @@ wheels = [
 [[package]]
 name = "openapi-client"
 version = "1.0.0"
-source = { git = "https://github.com/kagisearch/kagi-api-python.git#c47ab64669709ae15c94bac45de2faec22e5d12b" }
+source = { git = "https://github.com/kagisearch/kagi-api-python.git#37bbdebefc7c97254db661c2af967ba9a4971071" }
 dependencies = [
     { name = "pydantic" },
     { name = "python-dateutil" },
