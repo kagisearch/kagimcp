@@ -34,7 +34,7 @@ _api_key = os.environ.get("KAGI_API_KEY")
 if not _api_key:
     raise ValueError("KAGI_API_KEY environment variable is required")
 
-# TODO: summarizer is not yet live on v1, so it's called directly against the v0 endpoint for now
+# TODO: summarizer and fastgpt are not yet live on v1, so they're called directly against the v0 endpoint for now
 
 _V0_BASE_URL = "https://kagi.com/api/v0"
 
@@ -55,6 +55,7 @@ def _timeout_from_env(name: str, default: float) -> float:
 _SEARCH_TIMEOUT = _timeout_from_env("KAGI_SEARCH_TIMEOUT", 10.0)
 _EXTRACT_TIMEOUT = _timeout_from_env("KAGI_EXTRACT_TIMEOUT", 30.0)
 _SUMMARIZER_TIMEOUT = _timeout_from_env("KAGI_SUMMARIZER_TIMEOUT", 30.0)
+_FASTGPT_TIMEOUT = _timeout_from_env("KAGI_FASTGPT_TIMEOUT", 10.0)
 
 
 def _max_retries_from_env() -> int:
@@ -91,13 +92,32 @@ extract_api = ExtractApi(_api_client)
 @retry(
     stop=stop_after_attempt(_MAX_RETRIES + 1),
     wait=wait_exponential_jitter(initial=0.5, max=10.0),
-    retry=retry_if_exception_type((httpx.TimeoutException, httpx.TransportError, httpx.HTTPStatusError)),
+    retry=retry_if_exception_type(
+        (httpx.TimeoutException, httpx.TransportError, httpx.HTTPStatusError)
+    ),
     reraise=True,
 )
 def _httpx_get_with_retry(
     url: str, *, params: dict[str, str], headers: dict[str, str], timeout: float
 ) -> httpx.Response:
     response = httpx.get(url, params=params, headers=headers, timeout=timeout)
+    if response.status_code in _RETRY_STATUSES:
+        response.raise_for_status()  # raises HTTPStatusError → retried
+    return response
+
+
+@retry(
+    stop=stop_after_attempt(_MAX_RETRIES + 1),
+    wait=wait_exponential_jitter(initial=0.5, max=10.0),
+    retry=retry_if_exception_type(
+        (httpx.TimeoutException, httpx.TransportError, httpx.HTTPStatusError)
+    ),
+    reraise=True,
+)
+def _httpx_post_json_with_retry(
+    url: str, *, json: dict[str, Any], headers: dict[str, str], timeout: float
+) -> httpx.Response:
+    response = httpx.post(url, json=json, headers=headers, timeout=timeout)
     if response.status_code in _RETRY_STATUSES:
         response.raise_for_status()  # raises HTTPStatusError → retried
     return response
@@ -337,6 +357,58 @@ def kagi_summarizer(
     if not output:
         raise ValueError(f"Kagi Summarizer API returned no output.{suffix}")
     return output
+
+
+@mcp.tool()
+def kagi_fastgpt(
+    query: str = Field(
+        description="The question to answer. Phrase as a natural-language question or instruction; FastGPT runs a web search internally and synthesizes an answer with citations."
+    ),
+    cache: bool = Field(
+        default=True,
+        description="Whether Kagi may return a cached answer if available. Set to False to force a fresh answer (counts as a full-cost request).",
+    ),
+) -> str:
+    """Answer a query using Kagi FastGPT. FastGPT performs a live web search and synthesizes an LLM answer with numbered references. Use for factual questions where citations matter."""
+    if not query:
+        raise ValueError("FastGPT called with no query.")
+
+    try:
+        response = _httpx_post_json_with_retry(
+            f"{_V0_BASE_URL}/fastgpt",
+            json={"query": query, "cache": cache},
+            headers={"Authorization": f"Bot {_api_key}"},
+            timeout=_FASTGPT_TIMEOUT,
+        )
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise ValueError(
+            f"Kagi FastGPT API error ({e.response.status_code}): "
+            f"{_format_error_body(e.response.text)}{_trace_suffix(e.response.headers)}"
+        )
+    except httpx.HTTPError as e:
+        raise ValueError(f"Kagi FastGPT API error: {e}")
+
+    suffix = _trace_suffix(response.headers)
+    body = response.json()
+    if errors := body.get("error"):
+        raise ValueError(f"Kagi FastGPT API error: {errors}{suffix}")
+
+    data = body.get("data") or {}
+    output = data.get("output")
+    if not output:
+        raise ValueError(f"Kagi FastGPT API returned no output.{suffix}")
+
+    references = data.get("references") or []
+    if not references:
+        return output
+
+    lines = [output, "", "References:"]
+    for i, ref in enumerate(references, start=1):
+        title = ref.get("title") or ref.get("url") or ""
+        url = ref.get("url") or ""
+        lines.append(f"[{i}] {title} — {url}" if url else f"[{i}] {title}")
+    return "\n".join(lines)
 
 
 @mcp.tool()
