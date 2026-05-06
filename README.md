@@ -4,9 +4,15 @@
   <img width="380" height="200" src="https://glama.ai/mcp/servers/xabrrs4bka/badge" alt="Kagi Server MCP server" />
 </a>
 
-## Setup Intructions
-> Before anything, unless you are just using non-search tools, ensure you have access to the search API. It is currently in closed beta and available upon request. Please reach out to support@kagi.com for an invite.
+## Tools
+The server exposes the following tools, backed by the [Kagi API](https://help.kagi.com/kagi/api/overview.html):
 
+- **`kagi_search_fetch`** — general web search (workflows: `search`, `news`, `videos`, `podcasts`, `images`), with optional inline page extracts, domain include/exclude, date filters, and file-type filter.
+- **`kagi_extract`** — fetch the full content of a page as markdown.
+- **`kagi_summarizer`** — summarize any URL (text page, video, audio, etc.) as prose or key takeaways.
+- **`kagi_fastgpt`** — answer a question with a live web search + LLM synthesis and numbered references.
+
+## Setup Intructions
 Install uv first.
 
 MacOS/Linux:
@@ -77,7 +83,11 @@ Now claude code can use the Kagi mcp server. However, claude code comes with its
 ```
 
 ### Pose query that requires use of a tool
-e.g. "Who was time's 2024 person of the year?" for search, or "summarize this video: https://www.youtube.com/watch?v=jNQXAC9IVRw" for summarizer.
+Examples:
+- Search: *"Who was time's 2024 person of the year?"*
+- Summarizer: *"summarize this video: https://www.youtube.com/watch?v=jNQXAC9IVRw"*
+- Extract: *"extract the full content of https://en.wikipedia.org/wiki/Model_Context_Protocol"*
+- FastGPT: *"what's the latest stable Postgres release and when was it cut?"* (returns an answer with citations)
 
 ### Debugging
 Run:
@@ -150,7 +160,11 @@ fastmcp install claude-desktop /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp/src/kagim
 ```
 
 ### Pose query that requires use of a tool
-e.g. "Who was time's 2024 person of the year?" for search, or "summarize this video: https://www.youtube.com/watch?v=jNQXAC9IVRw" for summarizer.
+Examples:
+- Search: *"Who was time's 2024 person of the year?"*
+- Summarizer: *"summarize this video: https://www.youtube.com/watch?v=jNQXAC9IVRw"*
+- Extract: *"extract the full content of https://en.wikipedia.org/wiki/Model_Context_Protocol"*
+- FastGPT: *"what's the latest stable Postgres release and when was it cut?"* (returns an answer with citations)
 
 ### Debugging
 Run:
@@ -176,6 +190,7 @@ Then access MCP Inspector at `http://localhost:5173`. You may need to add your K
   - `KAGI_SEARCH_TIMEOUT` — search requests (default: `10`)
   - `KAGI_EXTRACT_TIMEOUT` — page extraction (default: `30`)
   - `KAGI_SUMMARIZER_TIMEOUT` — summarization, which can be slow on long videos/docs (default: `30`)
+  - `KAGI_FASTGPT_TIMEOUT` — FastGPT answers (default: `10`)
 - Transient failures (HTTP 429/500/502/503/504, connection errors, timeouts) are retried with exponential backoff + jitter. Configure max retry attempts via `KAGI_MAX_RETRIES` (default: `2`, i.e. 3 total attempts). Set to `0` to disable retries.
 - Tool parameters can be hidden from the LLM via the `KAGI_HIDDEN_PARAMS` environment variable (comma-separated list). Hidden params fall back to their defaults, reducing context-window noise when you don't need fine-grained control.
   - Hideable params: `workflow`, `extract_count`, `limit`, `include_domains`, `exclude_domains`, `time_relative`, `after`, `before`, `file_type` (search).
