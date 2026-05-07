@@ -138,3 +138,7 @@ npx @modelcontextprotocol/inspector uv --directory /ABSOLUTE/PATH/TO/kagimcp run
 ```
 
 The inspector is usually available at `http://localhost:5173`.
+
+## Prerelease Instructions
+
+If using a prerelease build, the same installation instructions apply, but use `uvx --prerelease allow --from kagimcp==1.0.0rc2 kagimcp` instead of `uvx kagimcp` (replace `1.0.0rc2` with whatever version you're wanting to install).
