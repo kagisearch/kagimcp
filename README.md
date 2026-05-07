@@ -1,55 +1,44 @@
-# Kagi MCP server
+# Kagi MCP Server
 
-<a href="https://glama.ai/mcp/servers/xabrrs4bka">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/xabrrs4bka/badge" alt="Kagi Server MCP server" />
-</a>
+An MCP server backed by the [Kagi API](https://help.kagi.com/kagi/api/overview.html). It exposes search, extraction, summarization, and FastGPT tools to MCP-compatible clients.
 
 ## Tools
-The server exposes the following tools, backed by the [Kagi API](https://help.kagi.com/kagi/api/overview.html):
 
-- **`kagi_search_fetch`** — general web search (workflows: `search`, `news`, `videos`, `podcasts`, `images`), with optional inline page extracts, domain include/exclude, date filters, and file-type filter.
-- **`kagi_extract`** — fetch the full content of a page as markdown.
-- **`kagi_summarizer`** — summarize any URL (text page, video, audio, etc.) as prose or key takeaways.
-- **`kagi_fastgpt`** — answer a question with a live web search + LLM synthesis and numbered references.
+- **`kagi_search_fetch`** - web, news, videos, podcasts, and image search with optional page extracts and filters.
+- **`kagi_extract`** - fetch a page's full content as markdown.
+- **`kagi_summarizer`** - summarize a URL as prose or key takeaways.
+- **`kagi_fastgpt`** - answer a question with live web search, synthesis, and numbered references.
 
-## Setup Intructions
-Install uv first.
+## Requirements
 
-MacOS/Linux:
+- A Kagi API key in `KAGI_API_KEY`.
+- [`uv`](https://docs.astral.sh/uv/) for the recommended `uvx` install path.
+
+Install `uv`:
+
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 Windows:
-```
+
+```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
-### Installing via Smithery
 
-Alternatively, you can install Kagi for Claude Desktop via [Smithery](https://smithery.ai/server/kagimcp):
+## Client Setup
 
-```bash
-npx -y @smithery/cli install kagimcp --client claude
-```
-
-### Setup with OpenAI
-#### Codex CLI
-To add the Kagi mcp server to [codex cli](https://developers.openai.com/codex/cli/), you will need to use the following command:
+### Codex CLI
 
 ```bash
 codex mcp add kagi --env KAGI_API_KEY=<YOUR_API_KEY_HERE> -- uvx kagimcp
 ```
 
-This will write out the configuration to `~/.codex/config.toml`, so if you need to update/rotate your API key, update your key there before running `codex` again.
+Codex writes MCP configuration to `~/.codex/config.toml`.
 
-Codex CLI comes with its own built-in search (via `--search` flag), but it is disabled by default. So to deconflict between search and Kagi, just don't enable it.
+### Claude Desktop
 
-### Setup with Claude
-#### Claude Desktop
 ```json
-// claude_desktop_config.json
-// Can find location through:
-// Hamburger Menu -> File -> Settings -> Developer -> Edit Config
 {
   "mcpServers": {
     "kagi": {
@@ -57,143 +46,95 @@ Codex CLI comes with its own built-in search (via `--search` flag), but it is di
       "args": ["kagimcp"],
       "env": {
         "KAGI_API_KEY": "YOUR_API_KEY_HERE",
-        "KAGI_SUMMARIZER_ENGINE": "YOUR_ENGINE_CHOICE_HERE" // Defaults to "cecil" engine if env var not present
+        "KAGI_SUMMARIZER_ENGINE": "cecil"
       }
     }
   }
 }
 ```
-#### Claude Code
-Add the Kagi mcp server with the following command (setting summarizer engine optional):
+
+### Claude Code
 
 ```bash
-claude mcp add kagi -e KAGI_API_KEY="YOUR_API_KEY_HERE" KAGI_SUMMARIZER_ENGINE="YOUR_ENGINE_CHOICE_HERE" -- uvx kagimcp
+claude mcp add kagi -e KAGI_API_KEY="YOUR_API_KEY_HERE" -- uvx kagimcp
 ```
 
-Now claude code can use the Kagi mcp server. However, claude code comes with its own web search functionality by default, which may conflict with Kagi. You can disable claude's web search functionality with the following in your claude code settings file (`~/.claude/settings.json`):
+With a custom summarizer engine:
 
-```json
-{
-  "permissions": {
-    "deny": [
-      "WebSearch"
-    ]
-  }
-}
+```bash
+claude mcp add kagi -e KAGI_API_KEY="YOUR_API_KEY_HERE" KAGI_SUMMARIZER_ENGINE="daphne" -- uvx kagimcp
 ```
 
-### Pose query that requires use of a tool
-Examples:
-- Search: *"Who was time's 2024 person of the year?"*
-- Summarizer: *"summarize this video: https://www.youtube.com/watch?v=jNQXAC9IVRw"*
-- Extract: *"extract the full content of https://en.wikipedia.org/wiki/Model_Context_Protocol"*
-- FastGPT: *"what's the latest stable Postgres release and when was it cut?"* (returns an answer with citations)
+### Smithery
 
-### Debugging
-Run:
+```bash
+npx -y @smithery/cli install kagimcp --client claude
+```
+
+## Usage Examples
+
+- Search: `Who was Time's 2024 person of the year?`
+- Summarizer: `summarize this video: https://www.youtube.com/watch?v=jNQXAC9IVRw`
+- Extract: `extract the full content of https://en.wikipedia.org/wiki/Model_Context_Protocol`
+
+## Configuration
+
+Environment variable | Description
+--- | ---
+`KAGI_API_KEY` | Required Kagi API key.
+`KAGI_SUMMARIZER_ENGINE` | Summarizer engine. Defaults to `cecil`.
+`FASTMCP_LOG_LEVEL` | Logging level, for example `ERROR`.
+`KAGI_SEARCH_TIMEOUT` | Search timeout in seconds. Defaults to `10`.
+`KAGI_EXTRACT_TIMEOUT` | Extract timeout in seconds. Defaults to `30`.
+`KAGI_SUMMARIZER_TIMEOUT` | Summarizer timeout in seconds. Defaults to `30`.
+`KAGI_FASTGPT_TIMEOUT` | FastGPT timeout in seconds. Defaults to `10`.
+`KAGI_MAX_RETRIES` | Max retry attempts after the first request. Defaults to `2`; set `0` to disable retries.
+`KAGI_HIDDEN_PARAMS` | Comma-separated search params to hide from the LLM-facing schema.
+
+Hideable search params:
+
+```text
+workflow, extract_count, limit, include_domains, exclude_domains, time_relative, after, before, file_type
+```
+
+Example:
+
+```bash
+KAGI_HIDDEN_PARAMS="extract_count,after,before,time_relative,include_domains,exclude_domains"
+```
+
+## Local Development
+
+```bash
+git clone https://github.com/kagisearch/kagimcp.git
+cd kagimcp
+uv sync
+```
+
+Run locally over stdio:
+
+```bash
+KAGI_API_KEY=<YOUR_API_KEY_HERE> uv run kagimcp
+```
+
+Run with streamable HTTP transport:
+
+```bash
+KAGI_API_KEY=<YOUR_API_KEY_HERE> uv run kagimcp --http --host 0.0.0.0 --port 8000
+```
+
+## Debugging
+
+Inspect the published package:
+
 ```bash
 npx @modelcontextprotocol/inspector uvx kagimcp
 ```
 
-## Local/Dev Setup Instructions
+Inspect a local checkout:
 
-### Clone repo
-`git clone https://github.com/kagisearch/kagimcp.git`
-
-### Install dependencies
-Install uv first.
-
-MacOS/Linux:
 ```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
+npx @modelcontextprotocol/inspector uv --directory /ABSOLUTE/PATH/TO/kagimcp run kagimcp
 ```
 
-Windows:
-```
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-Then install MCP server dependencies:
-```bash
-cd kagimcp
-
-# Create virtual environment and activate it
-uv venv
-
-source .venv/bin/activate # MacOS/Linux
-# OR
-.venv/Scripts/activate # Windows
-
-# Install dependencies
-uv sync
-```
-### Setup with Claude Desktop
-
-#### Using FastMCP CLI
-```bash
-# `pip install fastmcp` if you haven't
-fastmcp install claude-desktop /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp/src/kagimcp/server.py --env KAGI_API_KEY=API_KEY_HERE
-```
-
-#### Manually
-```json
-# claude_desktop_config.json
-# Can find location through:
-# Hamburger Menu -> File -> Settings -> Developer -> Edit Config
-{
-  "mcpServers": {
-    "kagi": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp",
-        "run",
-        "kagimcp"
-      ],
-      "env": {
-        "KAGI_API_KEY": "YOUR_API_KEY_HERE",
-        "KAGI_SUMMARIZER_ENGINE": "YOUR_ENGINE_CHOICE_HERE" // Defaults to "cecil" engine if env var not present
-      }
-    }
-  }
-}
-```
-
-### Pose query that requires use of a tool
-Examples:
-- Search: *"Who was time's 2024 person of the year?"*
-- Summarizer: *"summarize this video: https://www.youtube.com/watch?v=jNQXAC9IVRw"*
-- Extract: *"extract the full content of https://en.wikipedia.org/wiki/Model_Context_Protocol"*
-- FastGPT: *"what's the latest stable Postgres release and when was it cut?"* (returns an answer with citations)
-
-### Debugging
-Run:
-```bash
-# If fastmcp installed (`pip install fastmcp`)
-fastmcp dev inspector /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp/src/kagimcp/server.py
-
-# If not
-npx @modelcontextprotocol/inspector \
-      uv \
-      --directory /ABSOLUTE/PATH/TO/PARENT/FOLDER/kagimcp \
-      run \
-      kagimcp
-```
-Then access MCP Inspector at `http://localhost:5173`. You may need to add your Kagi API key in the environment variables in the inspector under `KAGI_API_KEY`.
-
-# Advanced Configuration
-- Level of logging is adjustable through the `FASTMCP_LOG_LEVEL` environment variable (e.g. `FASTMCP_LOG_LEVEL="ERROR"`)
-  - Relevant issue: https://github.com/kagisearch/kagimcp/issues/4
-- Summarizer engine can be customized using the `KAGI_SUMMARIZER_ENGINE` environment variable (e.g. `KAGI_SUMMARIZER_ENGINE="daphne"`)
-  - Learn about the different summarization engines [here](https://help.kagi.com/kagi/api/summarizer.html#summarization-engines)
-- Per-tool request timeouts (in seconds) can be set via environment variables. Defaults are tuned for typical latency of each endpoint:
-  - `KAGI_SEARCH_TIMEOUT` — search requests (default: `10`)
-  - `KAGI_EXTRACT_TIMEOUT` — page extraction (default: `30`)
-  - `KAGI_SUMMARIZER_TIMEOUT` — summarization, which can be slow on long videos/docs (default: `30`)
-  - `KAGI_FASTGPT_TIMEOUT` — FastGPT answers (default: `10`)
-- Transient failures (HTTP 429/500/502/503/504, connection errors, timeouts) are retried with exponential backoff + jitter. Configure max retry attempts via `KAGI_MAX_RETRIES` (default: `2`, i.e. 3 total attempts). Set to `0` to disable retries.
-- Tool parameters can be hidden from the LLM via the `KAGI_HIDDEN_PARAMS` environment variable (comma-separated list). Hidden params fall back to their defaults, reducing context-window noise when you don't need fine-grained control.
-  - Hideable params: `workflow`, `extract_count`, `limit`, `include_domains`, `exclude_domains`, `time_relative`, `after`, `before`, `file_type` (search).
-  - Example: `KAGI_HIDDEN_PARAMS="extract_count,after,before,time_relative,include_domains,exclude_domains"` trims the search tool down to `query`, `workflow`, `limit`.
-- There may be more secure ways of plugging into the MCP. A user wrote down some details [here](https://github.com/lardinator/kagimcp/blob/main/docs/secure-api-key-storage.md)
-- The `--http` cli option can be used to toggle streamable HTTP transport on. Can use along with `--port` and `--host` args.
+The inspector is usually available at `http://localhost:5173`.
