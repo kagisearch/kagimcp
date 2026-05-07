@@ -420,8 +420,9 @@ def kagi_extract(
         raise ValueError("Extract called with no URL.")
 
     try:
+        # JSON mode returns a structured envelope whose page payload is still markdown.
         response = extract_api.extract_content(
-            ExtractRequest(pages=[PageInput(url=url)], format="markdown"),
+            ExtractRequest(pages=[PageInput(url=url)], format="json"),
             _request_timeout=_EXTRACT_TIMEOUT,
         )
     except ApiException as e:
