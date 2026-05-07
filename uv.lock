@@ -463,7 +463,7 @@ wheels = [
 
 [[package]]
 name = "kagimcp"
-version = "0.1.5"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
@@ -557,7 +557,7 @@ wheels = [
 [[package]]
 name = "openapi-client"
 version = "1.0.0"
-source = { git = "https://github.com/kagisearch/kagi-api-python.git#37bbdebefc7c97254db661c2af967ba9a4971071" }
+source = { git = "https://github.com/kagisearch/kagi-api-python.git#a1960d11578f773914c71db72c190a69e0352cef" }
 dependencies = [
     { name = "pydantic" },
     { name = "python-dateutil" },
