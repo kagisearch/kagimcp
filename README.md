@@ -82,6 +82,25 @@ npx -y @smithery/cli install kagimcp --client claude
 
 Add to your Kiro MCP config file (`~/.kiro/settings/mcp.json` for global, or `.kiro/settings/mcp.json` for project-scoped) using the same `mcpServers` JSON as [Claude Desktop](#claude-desktop). See the [Kiro MCP documentation](https://kiro.dev/docs/mcp/) for more details.
 
+### OpenCode
+
+Edit the OpenCode configuration file in `~/.config/opencode/opencode.json` and add the following:
+
+```json
+{
+  "mcp": {
+    "kagi": {
+      "type": "local",
+      "command": ["uvx", "kagimcp"],
+      "enabled": true,
+      "environment": {
+        "KAGI_API_KEY": "<YOUR_API_KEY_HERE>"
+      }
+    }
+  }
+}
+```
+
 ## Usage Examples
 
 - Search: `Who was Time's 2024 person of the year?`
