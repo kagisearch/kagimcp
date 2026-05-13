@@ -6,11 +6,11 @@ import argparse
 
 from kagiapi import KagiClient
 from kagiapi.models import SearchResponse
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from pydantic import Field
 
 kagi_client = KagiClient()
-mcp = FastMCP("kagimcp", dependencies=["kagiapi", "mcp[cli]"])
+mcp = FastMCP("kagimcp")
 
 
 @mcp.tool()
@@ -146,9 +146,13 @@ def main():
     args = parser.parse_args()
 
     if args.http:
-        mcp.settings.host = args.host
-        mcp.settings.port = args.port
-        mcp.run("streamable-http")
+        run_kwargs: dict[str, Any] = {
+            "transport": "http",
+            "host": args.host,
+            "port": args.port,
+        }
+
+        mcp.run(**run_kwargs)
     else:
         mcp.run()  # default stdio mode
 
