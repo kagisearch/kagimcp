@@ -353,10 +353,45 @@ def main():
     parser.add_argument(
         "--port", type=int, default=8000, help="Port to listen on (default: 8000)"
     )
+    parser.add_argument(
+        "--cors-origins",
+        type=str,
+        help="Comma-separated list of allowed CORS origins for HTTP mode "
+        "(e.g. 'https://app.example.com,https://localhost:3000'). "
+        "Only applies with --http; omit to disable CORS.",
+    )
     args = parser.parse_args()
 
     if args.http:
-        mcp.run("streamable-http", host=args.host, port=args.port, stateless_http=True)
+        run_kwargs: dict[str, Any] = {
+            "transport": "streamable-http",
+            "host": args.host,
+            "port": args.port,
+            "stateless_http": True,
+        }
+
+        if args.cors_origins:
+            from starlette.middleware import Middleware
+            from starlette.middleware.cors import CORSMiddleware
+
+            origins = [o.strip() for o in args.cors_origins.split(",") if o.strip()]
+            run_kwargs["middleware"] = [
+                Middleware(
+                    CORSMiddleware,
+                    allow_origins=origins,
+                    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+                    allow_headers=[
+                        "mcp-protocol-version",
+                        "mcp-session-id",
+                        "Authorization",
+                        "Content-Type",
+                        _TRACE_HEADER,
+                    ],
+                    expose_headers=["mcp-session-id"],
+                ),
+            ]
+
+        mcp.run(**run_kwargs)
     else:
         mcp.run()  # default stdio mode
 
