@@ -117,6 +117,11 @@ def _clients_for(key: str) -> tuple[SearchApi, ExtractApi]:
     return SearchApi(api_client), ExtractApi(api_client)
 
 
+# Shared connection pool for v0 endpoints. Auth is per-request via the
+# Authorization header, so the same pool serves every tenant.
+_v0_client = httpx.Client(base_url=_V0_BASE_URL)
+
+
 @retry(
     stop=stop_after_attempt(_MAX_RETRIES + 1),
     wait=wait_exponential_jitter(initial=0.5, max=10.0),
@@ -126,9 +131,9 @@ def _clients_for(key: str) -> tuple[SearchApi, ExtractApi]:
     reraise=True,
 )
 def _httpx_get_with_retry(
-    url: str, *, params: dict[str, str], headers: dict[str, str], timeout: float
+    path: str, *, params: dict[str, str], headers: dict[str, str], timeout: float
 ) -> httpx.Response:
-    response = httpx.get(url, params=params, headers=headers, timeout=timeout)
+    response = _v0_client.get(path, params=params, headers=headers, timeout=timeout)
     if response.status_code in _RETRY_STATUSES:
         response.raise_for_status()  # raises HTTPStatusError → retried
     return response
@@ -143,9 +148,9 @@ def _httpx_get_with_retry(
     reraise=True,
 )
 def _httpx_post_json_with_retry(
-    url: str, *, json: dict[str, Any], headers: dict[str, str], timeout: float
+    path: str, *, json: dict[str, Any], headers: dict[str, str], timeout: float
 ) -> httpx.Response:
-    response = httpx.post(url, json=json, headers=headers, timeout=timeout)
+    response = _v0_client.post(path, json=json, headers=headers, timeout=timeout)
     if response.status_code in _RETRY_STATUSES:
         response.raise_for_status()  # raises HTTPStatusError → retried
     return response
@@ -388,7 +393,7 @@ def kagi_summarizer(
 
     try:
         response = _httpx_get_with_retry(
-            f"{_V0_BASE_URL}/summarize",
+            "/summarize",
             params=params,
             headers={"Authorization": f"Bot {_resolve_api_key()}"},
             timeout=_SUMMARIZER_TIMEOUT,
@@ -429,7 +434,7 @@ def kagi_fastgpt(
 
     try:
         response = _httpx_post_json_with_retry(
-            f"{_V0_BASE_URL}/fastgpt",
+            "/fastgpt",
             json={"query": query, "cache": cache},
             headers={"Authorization": f"Bot {_resolve_api_key()}"},
             timeout=_FASTGPT_TIMEOUT,
