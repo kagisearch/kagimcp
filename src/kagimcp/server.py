@@ -143,6 +143,7 @@ _HIDEABLE_PARAMS: dict[str, set[str]] = {
         "after",
         "before",
         "file_type",
+        "lens_id",
     },
 }
 
@@ -243,6 +244,23 @@ def kagi_search_fetch(
         default=None,
         description="Restrict to results with this file type (e.g., 'pdf', 'docx', 'xlsx'). Specify the extension without a leading dot.",
     ),
+    lens_id: str | None = Field(
+        default=None,
+        description=(
+            "Apply a Kagi lens to narrow the search to a curated set of sources. "
+            "Built-in lens IDs: "
+            "'2' (Academic — education/.edu domains), "
+            "'1' (Forums — discussion forums across the web), "
+            "'15' (Programming — official programming language sites and forums), "
+            "'29' (News 360 — multi-perspective coverage of global news), "
+            "'120' (Recipes — high-quality recipe sites, English), "
+            "'107' (Small Web — noncommercial domains and topics). "
+            "You may also pass a custom lens ID or full URL from https://kagi.com/settings/lenses "
+            "(only shareable lenses work). "
+            "Mutually exclusive with 'include_domains', 'exclude_domains', 'time_relative', "
+            "and 'file_type'; use those args or 'lens_id', not both."
+        ),
+    ),
 ) -> str:
     """Fetch web results for a query using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are numbered so that a user may refer to a result by a specific number."""
     if not query:
@@ -259,6 +277,12 @@ def kagi_search_fetch(
         "time_relative": time_relative,
         "file_type": file_type,
     }
+    if lens_id and any(v is not None for v in lens_fields.values()):
+        raise ValueError(
+            "'lens_id' is mutually exclusive with 'include_domains', 'exclude_domains', "
+            "'time_relative', and 'file_type' (the server ignores 'lens_id' when any of "
+            "those are set). Use one or the other."
+        )
     lens = (
         SearchRequestLens(**lens_fields)
         if any(value is not None for value in lens_fields.values())
@@ -277,6 +301,7 @@ def kagi_search_fetch(
                 format="markdown",
                 limit=limit,
                 extract=extract,
+                lens_id=lens_id,
                 lens=lens,
                 filters=filters,
             ),
