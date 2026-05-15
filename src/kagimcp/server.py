@@ -143,11 +143,37 @@ def main():
     parser.add_argument(
         "--port", type=int, default=8000, help="Port to listen on (default: 8000)"
     )
+    parser.add_argument(
+        "--allowed-hosts",
+        type=str,
+        default=None,
+        help="Comma-separated list of allowed hosts for DNS rebinding protection "
+        "(e.g., '192.168.1.100:*,tailscale-host:*,*'). Use '*' to allow all hosts. "
+        "Automatically set when --host 0.0.0.0 is used.",
+    )
     args = parser.parse_args()
 
     if args.http:
         mcp.settings.host = args.host
         mcp.settings.port = args.port
+
+        # Configure DNS rebinding protection for network-accessible deployments
+        if args.host == "0.0.0.0":
+            ts = mcp.settings.transport_security
+            assert ts is not None  # always initialized at runtime
+            if args.allowed_hosts:
+                hosts = [h.strip() for h in args.allowed_hosts.split(",") if h.strip()]
+                # Normalize: add :* suffix if not present
+                allowed = [h if ":" in h else f"{h}:*" for h in hosts]
+                ts.allowed_hosts = allowed
+                allowed_origins = [f"http://{h}" for h in allowed]
+                ts.allowed_origins = allowed_origins
+            else:
+                # When binding to 0.0.0.0 without explicit allowed hosts,
+                # disable DNS rebinding protection to allow LAN/VPN access.
+                # Users should use --allowed-hosts in production for security.
+                ts.enable_dns_rebinding_protection = False
+
         mcp.run("streamable-http")
     else:
         mcp.run()  # default stdio mode
