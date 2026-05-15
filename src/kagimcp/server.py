@@ -132,6 +132,70 @@ def kagi_summarizer(
     return summary
 
 
+@mcp.tool()
+def kagi_fastgpt(
+    query: str = Field(
+        description="A natural-language question or prompt. FastGPT returns a concise answer grounded in live web search with inline citations."
+    ),
+    cache: bool = Field(
+        default=True,
+        description="Whether to allow Kagi to serve a cached answer. Set to False to force a fresh search.",
+    ),
+) -> str:
+    """Answer a question using Kagi FastGPT. FastGPT combines live web search with an LLM to produce a short, cited answer. Use for factual questions where a direct synthesized answer with sources is more useful than a raw list of search results. Output includes the answer followed by numbered references."""
+    if not query:
+        raise ValueError("FastGPT called with no query.")
+
+    # NOTE: kagiapi 0.2.1 serializes `cache` as a JSON string instead of a
+    # bool, which the FastGPT endpoint rejects. Call the endpoint directly
+    # via the client's authenticated session to sidestep the bug.
+    payload: dict = {"query": query, "cache": bool(cache)}
+    try:
+        http_response = kagi_client.session.post(
+            kagi_client.BASE_URL + "/fastgpt",
+            json=payload,
+            timeout=30,
+        )
+        http_response.raise_for_status()
+        response = http_response.json()
+    except Exception as e:
+        raise ValueError(f"Error calling Kagi FastGPT API: {e}")
+
+    if error := response.get("error"):
+        raise ValueError(error)
+
+    return format_fastgpt_response(response["data"])
+
+
+def format_fastgpt_response(data: dict) -> str:
+    """Format a FastGPT data block as answer text followed by numbered references."""
+    output = data.get("output", "").strip()
+    references = data.get("references") or []
+
+    if not references:
+        return output
+
+    ref_template = textwrap.dedent(
+        """
+        [{n}] {title}
+        {url}
+        {snippet}
+    """
+    ).strip()
+
+    formatted_refs = "\n\n".join(
+        ref_template.format(
+            n=i,
+            title=ref.get("title", "Not Available"),
+            url=ref.get("url", "Not Available"),
+            snippet=ref.get("snippet", ""),
+        )
+        for i, ref in enumerate(references, start=1)
+    )
+
+    return f"{output}\n\n-----\nReferences:\n-----\n{formatted_refs}"
+
+
 def main():
     parser = argparse.ArgumentParser(description="Kagi MCP Server")
     parser.add_argument(
