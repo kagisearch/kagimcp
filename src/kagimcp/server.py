@@ -26,13 +26,16 @@ from openapi_client import (
 )
 from openapi_client.exceptions import ApiException
 from fastmcp import FastMCP
+from fastmcp.server.auth import AccessToken, TokenVerifier
+from fastmcp.server.dependencies import get_access_token
 from fastmcp.server.transforms.tool_transform import ToolTransform
 from fastmcp.tools.tool_transform import ArgTransformConfig, ToolTransformConfig
 from pydantic import Field
+from functools import lru_cache
 
-_api_key = os.environ.get("KAGI_API_KEY")
-if not _api_key:
-    raise ValueError("KAGI_API_KEY environment variable is required")
+# Optional fallback for stdio / single-tenant use. In HTTP mode the key is read
+# per-request from the Authorization header instead.
+_api_key_env = os.environ.get("KAGI_API_KEY")
 
 # TODO: summarizer and fastgpt are not yet live on v1, so they're called directly against the v0 endpoint for now
 
@@ -74,19 +77,44 @@ def _max_retries_from_env() -> int:
 _MAX_RETRIES = _max_retries_from_env()
 _RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 
-_config = Configuration(access_token=_api_key)
-_config.retries = Retry(
-    total=_MAX_RETRIES,
-    backoff_factor=0.5,
-    backoff_max=10.0,
-    status_forcelist=list(_RETRY_STATUSES),
-    allowed_methods=None,
-    respect_retry_after_header=True,
-    raise_on_status=False,
-)
-_api_client = ApiClient(_config)
-search_api = SearchApi(_api_client)
-extract_api = ExtractApi(_api_client)
+class _KagiKeyPassthroughVerifier(TokenVerifier):
+    """Accepts any non-empty bearer token; Kagi itself validates the key."""
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        token = token.strip()
+        if not token:
+            return None
+        return AccessToken(token=token, client_id="kagi-user", scopes=[])
+
+
+def _resolve_api_key() -> str:
+    try:
+        access = get_access_token()
+    except RuntimeError:
+        access = None
+    if access and access.token:
+        return access.token
+    if _api_key_env:
+        return _api_key_env
+    raise ValueError(
+        "No Kagi API key found. Send `Authorization: Bearer <key>` or set KAGI_API_KEY."
+    )
+
+
+@lru_cache(maxsize=128)
+def _clients_for(key: str) -> tuple[SearchApi, ExtractApi]:
+    config = Configuration(access_token=key)
+    config.retries = Retry(
+        total=_MAX_RETRIES,
+        backoff_factor=0.5,
+        backoff_max=10.0,
+        status_forcelist=list(_RETRY_STATUSES),
+        allowed_methods=None,
+        respect_retry_after_header=True,
+        raise_on_status=False,
+    )
+    api_client = ApiClient(config)
+    return SearchApi(api_client), ExtractApi(api_client)
 
 
 @retry(
@@ -123,7 +151,7 @@ def _httpx_post_json_with_retry(
     return response
 
 
-mcp = FastMCP("kagimcp")
+mcp = FastMCP("kagimcp", auth=_KagiKeyPassthroughVerifier())
 
 
 _TRACE_HEADER = "x-kagi-trace"
@@ -293,6 +321,7 @@ def kagi_search_fetch(
         SearchRequestFilters(after=after, before=before) if after or before else None
     )
 
+    search_api, _ = _clients_for(_resolve_api_key())
     try:
         response = search_api.search_without_preload_content(
             SearchRequest(
@@ -361,7 +390,7 @@ def kagi_summarizer(
         response = _httpx_get_with_retry(
             f"{_V0_BASE_URL}/summarize",
             params=params,
-            headers={"Authorization": f"Bot {_api_key}"},
+            headers={"Authorization": f"Bot {_resolve_api_key()}"},
             timeout=_SUMMARIZER_TIMEOUT,
         )
         response.raise_for_status()
@@ -402,7 +431,7 @@ def kagi_fastgpt(
         response = _httpx_post_json_with_retry(
             f"{_V0_BASE_URL}/fastgpt",
             json={"query": query, "cache": cache},
-            headers={"Authorization": f"Bot {_api_key}"},
+            headers={"Authorization": f"Bot {_resolve_api_key()}"},
             timeout=_FASTGPT_TIMEOUT,
         )
         response.raise_for_status()
@@ -444,6 +473,7 @@ def kagi_extract(
     if not url:
         raise ValueError("Extract called with no URL.")
 
+    _, extract_api = _clients_for(_resolve_api_key())
     try:
         # JSON mode returns a structured envelope whose page payload is still markdown.
         response = extract_api.extract_content(
