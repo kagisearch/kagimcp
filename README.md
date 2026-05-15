@@ -4,7 +4,7 @@ An MCP server backed by the [Kagi API](https://help.kagi.com/kagi/api/overview.h
 
 ## Tools
 
-- **`kagi_search_fetch`** - web, news, videos, podcasts, and image search with optional page extracts and filters.
+- **`kagi_search_fetch`** - web, news, videos, podcasts, and image search with optional page extracts, filters, and Kagi lenses.
 - **`kagi_extract`** - fetch a page's full content as markdown.
 - **`kagi_summarizer`** - summarize a URL as prose or key takeaways.
 - **`kagi_fastgpt`** - answer a question with live web search, synthesis, and numbered references.
@@ -94,7 +94,7 @@ Environment variable | Description
 Hideable search params:
 
 ```text
-workflow, extract_count, limit, include_domains, exclude_domains, time_relative, after, before, file_type
+workflow, extract_count, limit, include_domains, exclude_domains, time_relative, after, before, file_type, lens_id
 ```
 
 Example:
