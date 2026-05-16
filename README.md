@@ -74,6 +74,27 @@ Now claude code can use the Kagi mcp server. However, claude code comes with its
 }
 ```
 
+### Setup with Kiro
+
+[![Add to Kiro](https://kiro.dev/images/add-to-kiro.svg)](https://kiro.dev/launch/mcp/add?name=kagi&config=%7B%22command%22%3A%22uvx%22%2C%22args%22%3A%5B%22kagimcp%22%5D%2C%22env%22%3A%7B%22KAGI_API_KEY%22%3A%22YOUR_API_KEY_HERE%22%7D%7D)
+
+Or add the following to your Kiro MCP config file (`~/.kiro/settings/mcp.json` for global, or `.kiro/settings/mcp.json` for project-scoped). See the [Kiro MCP documentation](https://kiro.dev/docs/mcp/) for more details.
+
+```json
+{
+  "mcpServers": {
+    "kagi": {
+      "command": "uvx",
+      "args": ["kagimcp"],
+      "env": {
+        "KAGI_API_KEY": "YOUR_API_KEY_HERE",
+        "KAGI_SUMMARIZER_ENGINE": "YOUR_ENGINE_CHOICE_HERE"
+      }
+    }
+  }
+}
+```
+
 ### Pose query that requires use of a tool
 e.g. "Who was time's 2024 person of the year?" for search, or "summarize this video: https://www.youtube.com/watch?v=jNQXAC9IVRw" for summarizer.
 
