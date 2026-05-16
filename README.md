@@ -74,6 +74,26 @@ Now claude code can use the Kagi mcp server. However, claude code comes with its
 }
 ```
 
+### Setup with OpenCode
+
+Edit the OpenCode configuration file in `~/.config/opencode/opencode.json` and add the following:
+
+```json
+{
+  "mcp": {
+    "kagi": {
+      "type": "local",
+      "command": ["uvx", "kagimcp"],
+      "enabled": true,
+      "environment": {
+        "KAGI_API_KEY": "<YOUR_API_KEY_HERE>",
+        "KAGI_SUMMARIZER_ENGINE": "cecil"
+      }
+    }
+  }
+}
+```
+
 ### Pose query that requires use of a tool
 e.g. "Who was time's 2024 person of the year?" for search, or "summarize this video: https://www.youtube.com/watch?v=jNQXAC9IVRw" for summarizer.
 
