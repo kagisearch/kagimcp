@@ -6,11 +6,11 @@ import argparse
 
 from kagiapi import KagiClient
 from kagiapi.models import SearchResponse
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from pydantic import Field
 
 kagi_client = KagiClient()
-mcp = FastMCP("kagimcp", dependencies=["kagiapi", "mcp[cli]"])
+mcp = FastMCP("kagimcp")
 
 
 @mcp.tool()
@@ -143,12 +143,41 @@ def main():
     parser.add_argument(
         "--port", type=int, default=8000, help="Port to listen on (default: 8000)"
     )
+    parser.add_argument(
+        "--cors-origins",
+        type=ascii,
+        help="Comma seperated list of allowed hosts for cors. (default: ''",
+    )
     args = parser.parse_args()
 
     if args.http:
-        mcp.settings.host = args.host
-        mcp.settings.port = args.port
-        mcp.run("streamable-http")
+        run_kwargs: dict[str, Any] = {
+            "transport": "http",
+            "host": args.host,
+            "port": args.port,
+        }
+
+        if args.cors_origins:
+            from starlette.middleware import Middleware
+            from starlette.middleware.cors import CORSMiddleware
+
+            origins = [o.strip() for o in args.cors_origins.split(",")]
+            run_kwargs["middleware"] = [
+                Middleware(
+                    CORSMiddleware,
+                    allow_origins=origins,
+                    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+                    allow_headers=[
+                        "mcp-protocol-version",
+                        "mcp-session-id",
+                        "Authorization",
+                        "Content-Type",
+                    ],
+                    expose_headers=["mcp-session-id"],
+                ),
+            ]
+
+        mcp.run(**run_kwargs)
     else:
         mcp.run()  # default stdio mode
 
