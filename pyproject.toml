@@ -1,6 +1,6 @@
 [project]
 name = "kagimcp"
-version = "1.0.0rc3"
+version = "1.0.0rc4"
 authors = [
     {name="Rehan Ali Rana", email="rehan@kagi.com"},
 ]

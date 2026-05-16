@@ -123,6 +123,33 @@ Run with streamable HTTP transport:
 KAGI_API_KEY=<YOUR_API_KEY_HERE> uv run kagimcp --http --host 0.0.0.0 --port 8000
 ```
 
+## Self-Hosting
+
+HTTP mode is multi-tenant: each request supplies its API key via the
+`Authorization: Bearer <key>` header instead of a server-wide env var, so one
+instance can serve multiple users. The repo ships a `Dockerfile` that installs a pinned `kagimcp` from PyPI and
+runs it in HTTP mode. The container respects `$PORT` so it works on any
+platform that injects one (Railway, Render, Cloud Run, Fly.io, etc.).
+
+Build and run locally:
+
+```sh
+docker build -t kagimcp-hosted .
+docker run --rm -p 8000:8000 kagimcp-hosted
+```
+
+Smoke test:
+
+```sh
+curl -sL http://127.0.0.1:8000/mcp -X POST \
+  -H "authorization: Bearer $KAGI_API_KEY" \
+  -H "content-type: application/json" \
+  -H "accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+To bump the version in production, edit the pin in the `Dockerfile` and redeploy.
+
 ## Debugging
 
 Inspect the published package:
