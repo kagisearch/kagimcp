@@ -20,6 +20,8 @@ from openapi_client import (
 from openapi_client.exceptions import ApiException
 from fastmcp import FastMCP
 from fastmcp.server.auth import AccessToken, TokenVerifier
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse
 from fastmcp.server.dependencies import get_access_token
 from fastmcp.server.transforms.tool_transform import ToolTransform
 from fastmcp.tools.tool_transform import ArgTransformConfig, ToolTransformConfig
@@ -155,6 +157,11 @@ def _apply_hidden_params() -> None:
 
 
 _apply_hidden_params()
+
+
+@mcp.custom_route("/healthz", methods=["GET"])
+async def healthz(_request: Request) -> PlainTextResponse:
+    return PlainTextResponse("ok")
 
 
 def _trace_suffix(headers: Any) -> str:
