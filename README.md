@@ -1,13 +1,11 @@
 # Kagi MCP Server
 
-An MCP server backed by the [Kagi API](https://help.kagi.com/kagi/api/overview.html). It exposes search, extraction, summarization, and FastGPT tools to MCP-compatible clients.
+An MCP server backed by the [Kagi API](https://help.kagi.com/kagi/api/overview.html). It exposes search and extraction tools to MCP-compatible clients.
 
 ## Tools
 
 - **`kagi_search_fetch`** - web, news, videos, podcasts, and image search with optional page extracts, filters, and Kagi lenses.
 - **`kagi_extract`** - fetch a page's full content as markdown.
-- **`kagi_summarizer`** - summarize a URL as prose or key takeaways.
-- **`kagi_fastgpt`** - answer a question with live web search, synthesis, and numbered references.
 
 ## Requirements
 
@@ -45,8 +43,7 @@ Codex writes MCP configuration to `~/.codex/config.toml`.
       "command": "uvx",
       "args": ["kagimcp"],
       "env": {
-        "KAGI_API_KEY": "YOUR_API_KEY_HERE",
-        "KAGI_SUMMARIZER_ENGINE": "cecil"
+        "KAGI_API_KEY": "YOUR_API_KEY_HERE"
       }
     }
   }
@@ -59,12 +56,6 @@ Codex writes MCP configuration to `~/.codex/config.toml`.
 claude mcp add kagi -e KAGI_API_KEY="YOUR_API_KEY_HERE" -- uvx kagimcp
 ```
 
-With a custom summarizer engine:
-
-```bash
-claude mcp add kagi -e KAGI_API_KEY="YOUR_API_KEY_HERE" KAGI_SUMMARIZER_ENGINE="daphne" -- uvx kagimcp
-```
-
 ### Smithery
 
 ```bash
@@ -74,7 +65,6 @@ npx -y @smithery/cli install kagimcp --client claude
 ## Usage Examples
 
 - Search: `Who was Time's 2024 person of the year?`
-- Summarizer: `summarize this video: https://www.youtube.com/watch?v=jNQXAC9IVRw`
 - Extract: `extract the full content of https://en.wikipedia.org/wiki/Model_Context_Protocol`
 
 ## Configuration
@@ -82,12 +72,9 @@ npx -y @smithery/cli install kagimcp --client claude
 Environment variable | Description
 --- | ---
 `KAGI_API_KEY` | Required Kagi API key.
-`KAGI_SUMMARIZER_ENGINE` | Summarizer engine. Defaults to `cecil`.
 `FASTMCP_LOG_LEVEL` | Logging level, for example `ERROR`.
 `KAGI_SEARCH_TIMEOUT` | Search timeout in seconds. Defaults to `10`.
 `KAGI_EXTRACT_TIMEOUT` | Extract timeout in seconds. Defaults to `30`.
-`KAGI_SUMMARIZER_TIMEOUT` | Summarizer timeout in seconds. Defaults to `30`.
-`KAGI_FASTGPT_TIMEOUT` | FastGPT timeout in seconds. Defaults to `10`.
 `KAGI_MAX_RETRIES` | Max retry attempts after the first request. Defaults to `2`; set `0` to disable retries.
 `KAGI_HIDDEN_PARAMS` | Comma-separated search params to hide from the LLM-facing schema.
 

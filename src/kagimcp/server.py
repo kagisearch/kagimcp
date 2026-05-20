@@ -1,16 +1,9 @@
-from typing import Any, Literal, cast
+from typing import Any, Literal
 from datetime import date
 import json
 import os
 import argparse
 
-import httpx
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential_jitter,
-)
 from urllib3.util.retry import Retry
 from openapi_client import (
     ApiClient,
@@ -37,10 +30,6 @@ from functools import lru_cache
 # per-request from the Authorization header instead.
 _api_key_env = os.environ.get("KAGI_API_KEY")
 
-# TODO: summarizer and fastgpt are not yet live on v1, so they're called directly against the v0 endpoint for now
-
-_V0_BASE_URL = "https://kagi.com/api/v0"
-
 
 def _timeout_from_env(name: str, default: float) -> float:
     raw = os.environ.get(name, "").strip()
@@ -57,8 +46,6 @@ def _timeout_from_env(name: str, default: float) -> float:
 
 _SEARCH_TIMEOUT = _timeout_from_env("KAGI_SEARCH_TIMEOUT", 10.0)
 _EXTRACT_TIMEOUT = _timeout_from_env("KAGI_EXTRACT_TIMEOUT", 30.0)
-_SUMMARIZER_TIMEOUT = _timeout_from_env("KAGI_SUMMARIZER_TIMEOUT", 30.0)
-_FASTGPT_TIMEOUT = _timeout_from_env("KAGI_FASTGPT_TIMEOUT", 10.0)
 
 
 def _max_retries_from_env() -> int:
@@ -115,45 +102,6 @@ def _clients_for(key: str) -> tuple[SearchApi, ExtractApi]:
     )
     api_client = ApiClient(config)
     return SearchApi(api_client), ExtractApi(api_client)
-
-
-# Shared connection pool for v0 endpoints. Auth is per-request via the
-# Authorization header, so the same pool serves every tenant.
-_v0_client = httpx.Client(base_url=_V0_BASE_URL)
-
-
-@retry(
-    stop=stop_after_attempt(_MAX_RETRIES + 1),
-    wait=wait_exponential_jitter(initial=0.5, max=10.0),
-    retry=retry_if_exception_type(
-        (httpx.TimeoutException, httpx.TransportError, httpx.HTTPStatusError)
-    ),
-    reraise=True,
-)
-def _httpx_get_with_retry(
-    path: str, *, params: dict[str, str], headers: dict[str, str], timeout: float
-) -> httpx.Response:
-    response = _v0_client.get(path, params=params, headers=headers, timeout=timeout)
-    if response.status_code in _RETRY_STATUSES:
-        response.raise_for_status()  # raises HTTPStatusError → retried
-    return response
-
-
-@retry(
-    stop=stop_after_attempt(_MAX_RETRIES + 1),
-    wait=wait_exponential_jitter(initial=0.5, max=10.0),
-    retry=retry_if_exception_type(
-        (httpx.TimeoutException, httpx.TransportError, httpx.HTTPStatusError)
-    ),
-    reraise=True,
-)
-def _httpx_post_json_with_retry(
-    path: str, *, json: dict[str, Any], headers: dict[str, str], timeout: float
-) -> httpx.Response:
-    response = _v0_client.post(path, json=json, headers=headers, timeout=timeout)
-    if response.status_code in _RETRY_STATUSES:
-        response.raise_for_status()  # raises HTTPStatusError → retried
-    return response
 
 
 mcp = FastMCP("kagimcp", auth=_KagiKeyPassthroughVerifier())
@@ -220,14 +168,11 @@ def _trace_suffix(headers: Any) -> str:
 
 
 def _format_error_body(body: str) -> str:
-    """
-    Pull message(s) out of a Kagi error envelope (v1 `errors[].message`, v0 `error[].msg`).
-    """
-    # TODO: unneeded when moved over to v1 endpoint completely
+    """Pull message(s) out of a Kagi v1 error envelope (`errors[].message`)."""
     try:
         parsed = json.loads(body)
-        errors = parsed.get("errors") or parsed.get("error") or []
-        return "; ".join(e.get("message") or e.get("msg") for e in errors) or body
+        errors = parsed.get("errors") or []
+        return "; ".join(e.get("message", "") for e in errors) or body
     except Exception:
         return body
 
@@ -355,119 +300,6 @@ def kagi_search_fetch(
         )
 
     return body
-
-
-@mcp.tool()
-def kagi_summarizer(
-    url: str = Field(description="A URL to a document to summarize."),
-    summary_type: Literal["summary", "takeaway"] = Field(
-        default="summary",
-        description="Type of summary to produce. Options are 'summary' for paragraph prose and 'takeaway' for a bulleted list of key points.",
-    ),
-    target_language: str | None = Field(
-        default=None,
-        description="Desired output language using language codes (e.g., 'EN' for English). If not specified, the document's original language influences the output.",
-    ),
-) -> str:
-    """Summarize content from a URL using the Kagi Summarizer API. The Summarizer can summarize any document type (text webpage, video, audio, etc.)"""
-    if not url:
-        raise ValueError("Summarizer called with no URL.")
-
-    engine = os.environ.get("KAGI_SUMMARIZER_ENGINE", "cecil")
-
-    valid_engines = {"cecil", "agnes", "daphne", "muriel"}
-    if engine not in valid_engines:
-        raise ValueError(
-            f"Summarizer configured incorrectly, invalid summarization engine set: {engine}. Must be one of the following: {valid_engines}"
-        )
-
-    engine = cast(Literal["cecil", "agnes", "daphne", "muriel"], engine)
-
-    params: dict[str, str] = {
-        "url": url,
-        "engine": engine,
-        "summary_type": summary_type,
-    }
-    if target_language is not None:
-        params["target_language"] = target_language
-
-    try:
-        response = _httpx_get_with_retry(
-            "/summarize",
-            params=params,
-            headers={"Authorization": f"Bot {_resolve_api_key()}"},
-            timeout=_SUMMARIZER_TIMEOUT,
-        )
-        response.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        raise ValueError(
-            f"Kagi Summarizer API error ({e.response.status_code}): "
-            f"{_format_error_body(e.response.text)}{_trace_suffix(e.response.headers)}"
-        )
-    except httpx.HTTPError as e:
-        raise ValueError(f"Kagi Summarizer API error: {e}")
-
-    suffix = _trace_suffix(response.headers)
-    body = response.json()
-    if errors := body.get("error"):
-        raise ValueError(f"Kagi Summarizer API error: {errors}{suffix}")
-
-    output = body.get("data", {}).get("output")
-    if not output:
-        raise ValueError(f"Kagi Summarizer API returned no output.{suffix}")
-    return output
-
-
-@mcp.tool()
-def kagi_fastgpt(
-    query: str = Field(
-        description="The question to answer. Phrase as a natural-language question or instruction; FastGPT runs a web search internally and synthesizes an answer with citations."
-    ),
-    cache: bool = Field(
-        default=True,
-        description="Whether Kagi may return a cached answer if available. Set to False to force a fresh answer (counts as a full-cost request).",
-    ),
-) -> str:
-    """Answer a query using Kagi FastGPT. FastGPT performs a live web search and synthesizes an LLM answer with numbered references. Use for factual questions where citations matter."""
-    if not query:
-        raise ValueError("FastGPT called with no query.")
-
-    try:
-        response = _httpx_post_json_with_retry(
-            "/fastgpt",
-            json={"query": query, "cache": cache},
-            headers={"Authorization": f"Bot {_resolve_api_key()}"},
-            timeout=_FASTGPT_TIMEOUT,
-        )
-        response.raise_for_status()
-    except httpx.HTTPStatusError as e:
-        raise ValueError(
-            f"Kagi FastGPT API error ({e.response.status_code}): "
-            f"{_format_error_body(e.response.text)}{_trace_suffix(e.response.headers)}"
-        )
-    except httpx.HTTPError as e:
-        raise ValueError(f"Kagi FastGPT API error: {e}")
-
-    suffix = _trace_suffix(response.headers)
-    body = response.json()
-    if errors := body.get("error"):
-        raise ValueError(f"Kagi FastGPT API error: {errors}{suffix}")
-
-    data = body.get("data") or {}
-    output = data.get("output")
-    if not output:
-        raise ValueError(f"Kagi FastGPT API returned no output.{suffix}")
-
-    references = data.get("references") or []
-    if not references:
-        return output
-
-    lines = [output, "", "References:"]
-    for i, ref in enumerate(references, start=1):
-        title = ref.get("title") or ref.get("url") or ""
-        url = ref.get("url") or ""
-        lines.append(f"[{i}] {title} — {url}" if url else f"[{i}] {title}")
-    return "\n".join(lines)
 
 
 @mcp.tool()
