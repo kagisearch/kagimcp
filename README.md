@@ -7,6 +7,8 @@ An MCP server backed by the [Kagi API](https://help.kagi.com/kagi/api/overview.h
 - **`kagi_search_fetch`** - web, news, videos, podcasts, and image search with optional page extracts, filters, and Kagi lenses.
 - **`kagi_extract`** - fetch a page's full content as markdown.
 
+> **Note:** The previous `kagi_fastgpt` and `kagi_summarizer` tools have been removed. Both are planned to return in a future release.
+
 ## Requirements
 
 - A Kagi API key in `KAGI_API_KEY`.
