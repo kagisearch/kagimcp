@@ -17,6 +17,8 @@ import io
 import json
 import re
 import ssl
+import urllib.request
+from urllib.parse import urlparse
 
 import urllib3
 
@@ -105,14 +107,24 @@ class RESTClientObject:
         # https pool manager
         self.pool_manager: urllib3.PoolManager
 
-        if configuration.proxy:
-            if is_socks_proxy_url(configuration.proxy):
+        proxies = urllib.request.getproxies()
+        parsed_host = urlparse(configuration.host)
+        proxy_url = None
+        if parsed_host.hostname and not urllib.request.proxy_bypass(parsed_host.hostname):
+            proxy_url = (
+                proxies.get(parsed_host.scheme)
+                or proxies.get('all')
+                or proxies.get('http')
+            )
+
+        if proxy_url:
+            if is_socks_proxy_url(proxy_url):
                 from urllib3.contrib.socks import SOCKSProxyManager
-                pool_args["proxy_url"] = configuration.proxy
+                pool_args["proxy_url"] = proxy_url
                 pool_args["headers"] = configuration.proxy_headers
                 self.pool_manager = SOCKSProxyManager(**pool_args)
             else:
-                pool_args["proxy_url"] = configuration.proxy
+                pool_args["proxy_url"] = proxy_url
                 pool_args["proxy_headers"] = configuration.proxy_headers
                 self.pool_manager = urllib3.ProxyManager(**pool_args)
         else:
