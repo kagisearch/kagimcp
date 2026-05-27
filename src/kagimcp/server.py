@@ -363,19 +363,14 @@ def main():
     args = parser.parse_args()
 
     if args.http:
-        run_kwargs: dict[str, Any] = {
-            "transport": "streamable-http",
-            "host": args.host,
-            "port": args.port,
-            "stateless_http": True,
-        }
+        cors_kwargs: dict[str, Any] = {}
 
         if args.cors_origins:
             from starlette.middleware import Middleware
             from starlette.middleware.cors import CORSMiddleware
 
             origins = [o.strip() for o in args.cors_origins.split(",") if o.strip()]
-            run_kwargs["middleware"] = [
+            cors_kwargs["middleware"] = [
                 Middleware(
                     CORSMiddleware,
                     allow_origins=origins,
@@ -391,7 +386,13 @@ def main():
                 ),
             ]
 
-        mcp.run(**run_kwargs)
+        mcp.run(
+            "streamable-http",
+            host=args.host,
+            port=args.port,
+            stateless_http=True,
+            **cors_kwargs,
+        )
     else:
         mcp.run()  # default stdio mode
 
