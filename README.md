@@ -25,7 +25,7 @@ Prefer to run it yourself? See [Client Setup](#client-setup) for the local `uvx`
 
 ## Requirements
 
-- A Kagi API key in `KAGI_API_KEY`.
+- A Kagi API key in `KAGI_API_KEY`, or you can login via OAuth to your Kagi account to automatically set this up.
 - [`uv`](https://docs.astral.sh/uv/) for the recommended `uvx` install path.
 
 Install `uv`:
@@ -130,6 +130,9 @@ Environment variable | Description
 `KAGI_EXTRACT_TIMEOUT` | Extract timeout in seconds. Defaults to `30`.
 `KAGI_MAX_RETRIES` | Max retry attempts after the first request. Defaults to `2`; set `0` to disable retries.
 `KAGI_HIDDEN_PARAMS` | Comma-separated search params to hide from the LLM-facing schema.
+`KAGI_MCP_PUBLIC_URL` | Public base URL of this MCP server for OAuth discovery; defaults to `https://mcp.kagi.com`.
+`KAGI_OAUTH_ISSUER` | Advertised authorization server issuer; defaults to `https://account.kagi.com`.
+`KAGI_OAUTH_METADATA_URL` | OIDC metadata for Authorization; defaults to `https://account.kagi.com/.well-known/openid-configuration`.
 
 Hideable search params:
 

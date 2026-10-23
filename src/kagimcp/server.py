@@ -1,8 +1,11 @@
 from typing import Any, Literal
 from datetime import date
+import asyncio
 import json
+import logging
 import os
 import argparse
+from urllib.request import urlopen
 
 from urllib3.util.retry import Retry
 from openapi_client import (
@@ -19,13 +22,15 @@ from openapi_client import (
 )
 from openapi_client.exceptions import ApiException
 from fastmcp import FastMCP
-from fastmcp.server.auth import AccessToken, TokenVerifier
+from fastmcp.server.auth import AccessToken, RemoteAuthProvider, TokenVerifier
+from mcp.server.auth.routes import cors_middleware
 from starlette.requests import Request
-from starlette.responses import PlainTextResponse
+from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.routing import Route
 from fastmcp.server.dependencies import get_access_token
 from fastmcp.server.transforms.tool_transform import ToolTransform
 from fastmcp.tools.tool_transform import ArgTransformConfig, ToolTransformConfig
-from pydantic import Field
+from pydantic import AnyHttpUrl, Field
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, version
 
@@ -77,7 +82,7 @@ _RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 
 
 class _KagiKeyPassthroughVerifier(TokenVerifier):
-    """Accepts any non-empty bearer token; Kagi itself validates the key."""
+    """No token verification happens on this server, it is passed through to the upstream Search API"""
 
     async def verify_token(self, token: str) -> AccessToken | None:
         token = token.strip()
@@ -117,7 +122,113 @@ def _clients_for(key: str) -> tuple[SearchApi, ExtractApi]:
     return SearchApi(api_client), ExtractApi(api_client)
 
 
-mcp = FastMCP("kagimcp", auth=_KagiKeyPassthroughVerifier())
+_MCP_PUBLIC_URL = AnyHttpUrl(
+        os.environ.get("KAGI_MCP_PUBLIC_URL", "https://mcp.kagi.com")
+)
+_OAUTH_ISSUER = os.environ.get("KAGI_OAUTH_ISSUER", "https://account.kagi.com").rstrip(
+    "/"
+)
+_OAUTH_METADATA_URL = os.environ.get(
+    "KAGI_OAUTH_METADATA_URL", f"{_OAUTH_ISSUER}/.well-known/openid-configuration"
+)
+_OAUTH_RESOURCE_SCOPES = [
+    "openid",
+    "profile",
+    "email",
+    "urn:zitadel:iam:org:project:id:393794653092071821:aud",
+]
+
+
+class _IssuerPreservingRemoteAuthProvider(RemoteAuthProvider):
+    def get_routes(self, mcp_path: str | None = None) -> list[Route]:
+        routes = super().get_routes(mcp_path)
+        resource_url = self._get_resource_url(mcp_path)
+        if resource_url is None:
+            return routes
+
+        # The SDK normalizes bare AnyHttpUrl origins with a trailing slash.
+        # Kagi's issuer has none; OAuth issuer comparisons must be exact.
+        metadata = {
+            "resource": str(resource_url),
+            "authorization_servers": [_OAUTH_ISSUER],
+            "scopes_supported": _OAUTH_RESOURCE_SCOPES,
+            "bearer_methods_supported": ["header"],
+            "resource_name": "Kagi Search API MCP",
+        }
+
+        async def protected_resource_metadata(_request: Request) -> JSONResponse:
+            return JSONResponse(metadata)
+
+        endpoint = cors_middleware(protected_resource_metadata, ["GET", "OPTIONS"])
+        return [
+            Route(route.path, endpoint=endpoint, methods=["GET", "OPTIONS"])
+            for route in routes
+        ] + [
+            Route(
+                "/.well-known/oauth-protected-resource",
+                endpoint=endpoint,
+                methods=["GET", "OPTIONS"],
+            )
+        ]
+
+mcp = FastMCP(
+    "kagimcp",
+    auth=_IssuerPreservingRemoteAuthProvider(
+        token_verifier=_KagiKeyPassthroughVerifier(),
+        authorization_servers=[AnyHttpUrl(_OAUTH_ISSUER)],
+        base_url=_MCP_PUBLIC_URL,
+        scopes_supported=_OAUTH_RESOURCE_SCOPES,
+        resource_name="Kagi Search API MCP",
+    ),
+)
+
+
+def _fetch_oauth_authorization_server_metadata() -> dict[str, Any]:
+    with urlopen(_OAUTH_METADATA_URL, timeout=5) as response:
+        metadata = json.load(response)
+
+    if not isinstance(metadata, dict) or metadata.get("issuer") != _OAUTH_ISSUER:
+        raise ValueError("OAuth metadata issuer does not match the advertised issuer")
+    if not metadata.get("authorization_endpoint") or not metadata.get("token_endpoint"):
+        raise ValueError("OAuth metadata is missing authorization or token endpoints")
+
+    # We do not support dynamic client registration at the moment, so we drop this field.
+    metadata.pop("registration_endpoint", None)
+    return metadata
+
+
+_oauth_metadata: dict[str, Any] | None = None
+_oauth_metadata_loaded = False
+_oauth_metadata_lock = asyncio.Lock()
+
+
+@mcp.custom_route("/.well-known/oauth-authorization-server", methods=["GET"])
+async def oauth_authorization_server_metadata(_request: Request) -> JSONResponse:
+    global _oauth_metadata, _oauth_metadata_loaded
+
+    if not _oauth_metadata_loaded:
+        async with _oauth_metadata_lock:
+            if not _oauth_metadata_loaded:
+                try:
+                    _oauth_metadata = await asyncio.to_thread(
+                        _fetch_oauth_authorization_server_metadata
+                    )
+                except (OSError, ValueError) as exc:
+                    logging.getLogger(__name__).warning(
+                        "Failed to read authorization server metadata from %s: %s",
+                        _OAUTH_METADATA_URL,
+                        exc,
+                    )
+                _oauth_metadata_loaded = True
+
+    if _oauth_metadata is None:
+        return JSONResponse(
+            {"error": "OAuth metadata unavailable"},
+            status_code=503,
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
+
+    return JSONResponse(_oauth_metadata, headers={"Access-Control-Allow-Origin": "*"})
 
 
 _TRACE_HEADER = "x-kagi-trace"
