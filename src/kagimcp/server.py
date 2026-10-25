@@ -23,11 +23,13 @@ from openapi_client import (
 from openapi_client.exceptions import ApiException
 from fastmcp import FastMCP
 from fastmcp.server.auth import AccessToken, RemoteAuthProvider, TokenVerifier
-from mcp.server.auth.routes import cors_middleware
+from mcp.server.auth.routes import build_resource_metadata_url, cors_middleware
+from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.routing import Route
-from fastmcp.server.dependencies import get_access_token
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from fastmcp.server.dependencies import get_access_token, get_http_request
 from fastmcp.server.transforms.tool_transform import ToolTransform
 from fastmcp.tools.tool_transform import ArgTransformConfig, ToolTransformConfig
 from pydantic import AnyHttpUrl, Field
@@ -103,6 +105,63 @@ def _resolve_api_key() -> str:
     raise ValueError(
         "No Kagi API key found. Send `Authorization: Bearer <key>` or set KAGI_API_KEY."
     )
+
+
+_AUTH_FAILURE_STATE_KEY = "_kagi_upstream_auth_rejected"
+
+
+def _mark_upstream_auth_failure(status: int | None) -> None:
+    if status != 401:
+        return
+    try:
+        request = get_http_request()
+    except RuntimeError:
+        return  # Stdio keeps the existing tool-error behavior.
+    setattr(request.state, _AUTH_FAILURE_STATE_KEY, True)
+
+
+class _KagiAuthFailureMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        scope.setdefault("state", {})[_AUTH_FAILURE_STATE_KEY] = False
+        replaced = False
+
+        async def send_response(message: Message) -> None:
+            nonlocal replaced
+            if replaced:
+                return  # Discard the original wrapped tool-error body.
+            if message["type"] == "http.response.start" and scope["state"].get(
+                _AUTH_FAILURE_STATE_KEY
+            ):
+                # JSON response mode waits for the tool before sending headers.
+                replaced = True
+                mcp_path = scope["app"].state.path
+                resource_url = AnyHttpUrl(
+                    f"{str(_MCP_PUBLIC_URL).rstrip('/')}/{mcp_path.lstrip('/')}"
+                )
+                metadata_url = build_resource_metadata_url(resource_url)
+                response = JSONResponse(
+                    {"error": "invalid_token"},
+                    status_code=401,
+                    headers={
+                        "WWW-Authenticate": (
+                            'Bearer error="invalid_token", '
+                            f'resource_metadata="{metadata_url}"'
+                        ),
+                        "Cache-Control": "no-store",
+                    },
+                )
+                await response(scope, receive, send)
+                return
+            await send(message)
+
+        await self.app(scope, receive, send_response)
 
 
 @lru_cache(maxsize=128)
@@ -416,12 +475,14 @@ def kagi_search_fetch(
             _request_timeout=_SEARCH_TIMEOUT,
         )
     except ApiException as e:
+        _mark_upstream_auth_failure(e.status)
         raise ValueError(
             f"Kagi Search API error ({e.status}): {_format_error_body(e.body or '')}{_trace_suffix(e.headers)}"
         )
     except Exception as e:
         raise ValueError(f"Error calling Kagi Search API: {e}")
 
+    _mark_upstream_auth_failure(response.status)
     body = response.data.decode("utf-8")
     if response.status >= 400:
         raise ValueError(
@@ -447,6 +508,7 @@ def kagi_extract(
             _request_timeout=_EXTRACT_TIMEOUT,
         )
     except ApiException as e:
+        _mark_upstream_auth_failure(e.status)
         raise ValueError(
             f"Kagi Extract API error ({e.status}): {_format_error_body(e.body or '')}{_trace_suffix(e.headers)}"
         )
@@ -485,14 +547,13 @@ def main():
     args = parser.parse_args()
 
     if args.http:
-        cors_kwargs: dict[str, Any] = {}
+        middleware: list[Middleware] = []
 
         if args.cors_origins:
-            from starlette.middleware import Middleware
             from starlette.middleware.cors import CORSMiddleware
 
             origins = [o.strip() for o in args.cors_origins.split(",") if o.strip()]
-            cors_kwargs["middleware"] = [
+            middleware.append(
                 Middleware(
                     CORSMiddleware,
                     allow_origins=origins,
@@ -505,15 +566,17 @@ def main():
                         _TRACE_HEADER,
                     ],
                     expose_headers=["mcp-session-id"],
-                ),
-            ]
+                )
+            )
 
+        middleware.append(Middleware(_KagiAuthFailureMiddleware))
         mcp.run(
             "streamable-http",
             host=args.host,
             port=args.port,
             stateless_http=True,
-            **cors_kwargs,
+            json_response=True,
+            middleware=middleware,
         )
     else:
         mcp.run()  # default stdio mode
