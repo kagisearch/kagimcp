@@ -5,6 +5,8 @@ import unittest
 from unittest.mock import patch
 
 import httpx
+from mcp.client.auth.utils import get_client_metadata_scopes
+from mcp.shared.auth import ProtectedResourceMetadata
 
 from kagimcp import server
 
@@ -82,6 +84,20 @@ class OAuthDiscoveryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), self.expected)
         fetch.assert_called_once_with(server._OAUTH_METADATA_URL, timeout=5)
+
+    async def test_discovery_allows_clients_to_request_refresh_tokens(self):
+        for path in (
+            "/.well-known/oauth-protected-resource",
+            "/.well-known/oauth-protected-resource/mcp",
+        ):
+            with self.subTest(path=path):
+                response = await self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                metadata = ProtectedResourceMetadata.model_validate(response.json())
+                self.assertIn("offline_access", metadata.scopes_supported)
+                selected_scopes = get_client_metadata_scopes(None, metadata).split()
+                self.assertIn("offline_access", selected_scopes)
+                self.assertIn("openid", selected_scopes)
 
 
 if __name__ == "__main__":
