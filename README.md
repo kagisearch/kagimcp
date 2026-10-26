@@ -193,6 +193,16 @@ curl -sL http://127.0.0.1:8000/mcp -X POST \
 
 To bump the version in production, edit the pin in the `Dockerfile` and redeploy.
 
+### OAuth token renewal
+
+For OAuth-enabled deployments, the server advertises `offline_access` in its
+protected-resource metadata so clients that use discovery to select scopes can
+request refresh tokens. Zitadel requires this scope to issue refresh tokens in
+the authorization code flow; see its [standard scopes documentation](https://zitadel.com/docs/apis/openidoauth/scopes#standard-scopes).
+The client stores and uses refresh tokens to obtain new access tokens through
+the [refresh token grant](https://zitadel.com/docs/apis/openidoauth/endpoints#refresh-token-grant).
+Token renewal is handled by the client, not the MCP server.
+
 ## Debugging
 
 Inspect the published package:

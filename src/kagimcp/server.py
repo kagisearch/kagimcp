@@ -194,6 +194,9 @@ _OAUTH_RESOURCE_SCOPES = [
     "openid",
     "profile",
     "email",
+    # Zitadel requires this scope to issue refresh tokens in the code flow.
+    # https://zitadel.com/docs/apis/openidoauth/scopes#standard-scopes
+    "offline_access",
     "urn:zitadel:iam:org:project:id:393794653092071821:aud",
 ]
 
