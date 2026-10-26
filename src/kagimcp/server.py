@@ -257,17 +257,17 @@ def _fetch_oauth_authorization_server_metadata() -> dict[str, Any]:
 
 
 _oauth_metadata: dict[str, Any] | None = None
-_oauth_metadata_loaded = False
 _oauth_metadata_lock = asyncio.Lock()
 
 
 @mcp.custom_route("/.well-known/oauth-authorization-server", methods=["GET"])
 async def oauth_authorization_server_metadata(_request: Request) -> JSONResponse:
-    global _oauth_metadata, _oauth_metadata_loaded
+    global _oauth_metadata
 
-    if not _oauth_metadata_loaded:
+    # Cache only successful discovery; a later request can retry after failure.
+    if _oauth_metadata is None:
         async with _oauth_metadata_lock:
-            if not _oauth_metadata_loaded:
+            if _oauth_metadata is None:
                 try:
                     _oauth_metadata = await asyncio.to_thread(
                         _fetch_oauth_authorization_server_metadata
@@ -278,7 +278,6 @@ async def oauth_authorization_server_metadata(_request: Request) -> JSONResponse
                         _OAUTH_METADATA_URL,
                         exc,
                     )
-                _oauth_metadata_loaded = True
 
     if _oauth_metadata is None:
         return JSONResponse(
