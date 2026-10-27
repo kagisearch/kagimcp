@@ -20,6 +20,7 @@ from openapi_client import (
 )
 from openapi_client.exceptions import ApiException
 from fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from fastmcp.server.auth import AccessToken, TokenVerifier
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
@@ -203,7 +204,7 @@ def _format_error_body(body: str) -> str:
     return body
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
 def kagi_search_fetch(
     query: str = Field(
         description="A concise, keyword-focused search query. Include essential context for standalone use."
@@ -328,7 +329,7 @@ def kagi_search_fetch(
     return body
 
 
-@mcp.tool()
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True))
 def kagi_extract(
     url: str = Field(description="The HTTPS URL of the page to extract content from."),
 ) -> str:
