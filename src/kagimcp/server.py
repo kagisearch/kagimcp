@@ -190,10 +190,17 @@ def _format_error_body(body: str) -> str:
     """Pull message(s) out of a Kagi v1 error envelope (`errors[].message`)."""
     try:
         parsed = json.loads(body)
-        errors = parsed.get("errors") or []
-        return "; ".join(e.get("message", "") for e in errors) or body
-    except Exception:
+    except json.JSONDecodeError:
         return body
+    match parsed:
+        case {"errors": [*errors]}:
+            messages = (
+                e.get("message") or e.get("code")
+                for e in errors
+                if isinstance(e, dict)
+            )
+            return "; ".join(filter(None, messages)) or body
+    return body
 
 
 @mcp.tool()
@@ -353,7 +360,8 @@ def kagi_extract(
             raise ValueError(f"Kagi Extract API failed to extract page: {error}{suffix}")
 
     if errors := response.errors:
-        raise ValueError(f"Kagi Extract API error: {errors}{suffix}")
+        messages = "; ".join(e.message or e.code for e in errors)
+        raise ValueError(f"Kagi Extract API error: {messages}{suffix}")
     raise ValueError(f"Kagi Extract API returned no content.{suffix}")
 
 
