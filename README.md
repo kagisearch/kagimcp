@@ -130,6 +130,7 @@ Environment variable | Description
 `KAGI_EXTRACT_TIMEOUT` | Extract timeout in seconds. Defaults to `30`.
 `KAGI_MAX_RETRIES` | Max retry attempts after the first request. Defaults to `2`; set `0` to disable retries.
 `KAGI_HIDDEN_PARAMS` | Comma-separated search params to hide from the LLM-facing schema.
+`KAGI_SEARCH_FORMAT` | Search result format: `json` (default) or `markdown` (the Search API's own markdown, passed through as-is).
 
 Hideable search params:
 

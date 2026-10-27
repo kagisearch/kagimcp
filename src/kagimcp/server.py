@@ -1,7 +1,9 @@
 from typing import Any, Literal
 from datetime import date
+import html
 import json
 import os
+import re
 import argparse
 
 from urllib3.util.retry import Retry
@@ -12,11 +14,13 @@ from openapi_client import (
     ExtractRequest,
     PageInput,
     PageOutput,
+    Search200Response,
     SearchApi,
     SearchRequest,
     SearchRequestExtract,
     SearchRequestFilters,
     SearchRequestLens,
+    SearchResult,
 )
 from openapi_client.exceptions import ApiException
 from fastmcp import FastMCP
@@ -76,6 +80,19 @@ def _max_retries_from_env() -> int:
 
 _MAX_RETRIES = _max_retries_from_env()
 _RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+
+
+def _search_format_from_env() -> Literal["json", "markdown"]:
+    raw = os.environ.get("KAGI_SEARCH_FORMAT", "").strip().lower()
+    match raw:
+        case "" | "json":
+            return "json"
+        case "markdown":
+            return "markdown"
+    raise ValueError(f"KAGI_SEARCH_FORMAT must be 'json' or 'markdown', got: {raw!r}")
+
+
+_SEARCH_FORMAT = _search_format_from_env()
 
 
 class _KagiKeyPassthroughVerifier(TokenVerifier):
@@ -204,7 +221,45 @@ def _format_error_body(body: str) -> str:
     return body
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=True), output_schema=None)
+# Kagi wraps query-term matches in titles and snippets with these tags.
+_HIGHLIGHT_TAGS = re.compile(r'</?strong>|<span class="ln-search-highlight">|</span>')
+
+
+def _clean_text(text: str) -> str:
+    return html.unescape(_HIGHLIGHT_TAGS.sub("", text))
+
+
+def _format_result(category: str, result: SearchResult, extracted: bool) -> dict[str, str]:
+    formatted = {"title": _clean_text(result.title), "url": result.url}
+    if category == "image" and result.image:
+        formatted["image_url"] = result.image.url
+    if result.time:
+        formatted["published"] = result.time.partition("T")[0]
+    if result.snippet:
+        # Extracted page markdown is left untouched; cleaning could mangle code
+        # like `Box<dyn Future<Output = ()>>`.
+        if extracted:
+            formatted["content"] = result.snippet
+        else:
+            formatted["snippet"] = _clean_text(result.snippet)
+    return formatted
+
+
+_SEARCH_DESCRIPTION = (
+    "Fetch web results for a query using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. "
+    + (
+        "Returns JSON with results grouped by category (search, news, video, podcast, image), in ranked order. Each result has a title, url, published date when known, and a snippet, or the page's full markdown as content for the top extract_count search results."
+        if _SEARCH_FORMAT == "json"
+        else "Returns markdown with results grouped by category, in ranked order. Each result has a title, URL, published date when known, and a snippet, or the page's full markdown for the top extract_count search results."
+    )
+)
+
+
+@mcp.tool(
+    description=_SEARCH_DESCRIPTION,
+    annotations=ToolAnnotations(readOnlyHint=True),
+    output_schema=None,
+)
 def kagi_search_fetch(
     query: str = Field(
         description="A concise, keyword-focused search query. Include essential context for standalone use."
@@ -267,7 +322,6 @@ def kagi_search_fetch(
         ),
     ),
 ) -> str:
-    """Fetch web results for a query using the Kagi Search API. Use for general search and when the user explicitly tells you to 'fetch' results/information. Results are numbered so that a user may refer to a result by a specific number."""
     if not query:
         raise ValueError("Search called with no query.")
 
@@ -300,11 +354,12 @@ def kagi_search_fetch(
 
     search_api, _ = _clients_for(_resolve_api_key())
     try:
+        # Raw variant: the typed deserializer can't handle text/markdown.
         response = search_api.search_without_preload_content(
             SearchRequest(
                 query=query,
                 workflow=workflow,
-                format="markdown",
+                format=_SEARCH_FORMAT,
                 limit=limit,
                 extract=extract,
                 lens_id=lens_id,
@@ -326,7 +381,32 @@ def kagi_search_fetch(
             f"Kagi Search API error ({response.status}): {_format_error_body(body)}{_trace_suffix(response.headers)}"
         )
 
-    return body
+    if _SEARCH_FORMAT == "markdown":
+        return body
+
+    parsed = Search200Response.from_json(body)
+    if not (parsed and (data := parsed.data)):
+        return "{}"
+
+    # The categories the API's markdown format renders; related searches,
+    # infoboxes, creator listings and the like are dropped.
+    categories = {
+        "search": data.search,
+        "news": data.news,
+        "video": data.video,
+        "podcast": data.podcast,
+        "image": data.image,
+    }
+    results = {
+        category: [
+            # Extract only ever applies to the top web results.
+            _format_result(category, result, category == "search" and rank < extract_count)
+            for rank, result in enumerate(items)
+        ]
+        for category, items in categories.items()
+        if items
+    }
+    return json.dumps(results, ensure_ascii=False, separators=(",", ":"))
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=True), output_schema=None)
