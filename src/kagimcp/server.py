@@ -11,6 +11,7 @@ from openapi_client import (
     ExtractApi,
     ExtractRequest,
     PageInput,
+    PageOutput,
     SearchApi,
     SearchRequest,
     SearchRequestExtract,
@@ -345,12 +346,15 @@ def kagi_extract(
     trace = response.meta.trace if response.meta else None
     suffix = f" (trace id: {trace})" if trace else ""
 
-    if not (pages := response.data) or not pages[0].markdown:
-        if errors := response.errors:
-            raise ValueError(f"Kagi Extract API error: {errors}{suffix}")
-        raise ValueError(f"Kagi Extract API returned no content.{suffix}")
+    match response.data:
+        case [PageOutput(markdown=str(markdown)), *_] if markdown:
+            return markdown
+        case [PageOutput(error=str(error)), *_] if error:
+            raise ValueError(f"Kagi Extract API failed to extract page: {error}{suffix}")
 
-    return pages[0].markdown
+    if errors := response.errors:
+        raise ValueError(f"Kagi Extract API error: {errors}{suffix}")
+    raise ValueError(f"Kagi Extract API returned no content.{suffix}")
 
 
 def main():
