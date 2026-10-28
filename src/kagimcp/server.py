@@ -36,9 +36,10 @@ from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    _USER_AGENT = f"KagiMCP/{version('kagimcp')}"
+    _VERSION: str | None = version("kagimcp")
 except PackageNotFoundError:
-    _USER_AGENT = "KagiMCP"
+    _VERSION = None
+_USER_AGENT = f"KagiMCP/{_VERSION}" if _VERSION else "KagiMCP"
 
 # Optional fallback for stdio / single-tenant use. In HTTP mode the key is read
 # per-request from the Authorization header instead.
@@ -136,7 +137,7 @@ def _clients_for(key: str) -> tuple[SearchApi, ExtractApi]:
     return SearchApi(api_client), ExtractApi(api_client)
 
 
-mcp = FastMCP("kagimcp", auth=_KagiKeyPassthroughVerifier())
+mcp = FastMCP("kagimcp", version=_VERSION, auth=_KagiKeyPassthroughVerifier())
 
 
 _TRACE_HEADER = "x-kagi-trace"
