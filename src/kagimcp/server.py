@@ -216,6 +216,10 @@ _OAUTH_RESOURCE_SCOPES = [
     "email",
     # Zitadel requires this scope to issue refresh tokens in the code flow.
     # https://zitadel.com/docs/apis/openidoauth/scopes#standard-scopes
+    # It is advertised in the protected-resource metadata so clients that pick
+    # scopes from discovery request refresh tokens. Renewal itself is done by the
+    # client via the refresh token grant, not by this server.
+    # https://zitadel.com/docs/apis/openidoauth/endpoints#refresh-token-grant
     "offline_access",
     "urn:zitadel:iam:org:project:id:393794653092071821:aud",
 ]

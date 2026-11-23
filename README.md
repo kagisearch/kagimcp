@@ -11,9 +11,54 @@ An MCP server backed by the [Kagi API](https://help.kagi.com/kagi/api/overview.h
 
 ## Hosted Server
 
-We run a hosted MCP server at **`https://mcp.kagi.com/mcp`** — no install required. Point any HTTP-capable MCP client at it and authenticate with your Kagi API key.
+We run a hosted MCP server at **`https://mcp.kagi.com/mcp`** — no install required. Point any HTTP-capable MCP client at it and either sign in with your Kagi account or authenticate with a Kagi API key.
 
-OAuth2 isn't supported yet (it's on our roadmap), so for now grab your [API key from the dashboard](https://kagi.com/api/keys) and pass it via `Bearer` HTTP authentication.
+### Sign in with your Kagi account (OAuth)
+
+Your client opens a browser to sign in at `account.kagi.com`, and an API key is set up for your account automatically. Tell your client to use Kagi's OAuth client ID: `393794653092071821`.
+
+> **Team accounts:** automatic key setup currently only works for the account owner. Other members should ask the owner for an [API key](#use-an-api-key) instead.
+
+**Claude Code**
+
+```bash
+claude mcp add kagi https://mcp.kagi.com/mcp --transport http --client-id 393794653092071821 --scope user
+```
+
+Then run `/mcp`, select `kagi`, and choose **Authenticate**.
+
+**Codex CLI**
+
+```bash
+codex mcp add kagi --url https://mcp.kagi.com/mcp --oauth-client-id 393794653092071821
+codex mcp login kagi
+```
+
+**OpenCode**
+
+Add to `~/.config/opencode/opencode.json`, then run `opencode mcp auth kagi`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "kagi": {
+        "type": "remote",
+        "url": "https://mcp.kagi.com/mcp",
+        "oauth": { "client_id": "393794653092071821" }
+      }
+    }
+  }
+}
+```
+
+**Claude (claude.ai and Claude Desktop)**
+
+In **Customize → Connectors**, choose **Add custom connector** and enter `https://mcp.kagi.com/mcp` as the URL. Under **OAuth client**, choose **Use your own OAuth client** and enter `393794653092071821` as the Client ID, leaving the secret empty.
+
+### Use an API key
+
+Grab your [API key from the dashboard](https://kagi.com/api/keys) and pass it via `Bearer` HTTP authentication.
 
 Example with Claude Code:
 
@@ -25,7 +70,7 @@ Prefer to run it yourself? See [Client Setup](#client-setup) for the local `uvx`
 
 ## Requirements
 
-- A Kagi API key in `KAGI_API_KEY`, or you can login via OAuth to your Kagi account to automatically set this up.
+- A Kagi API key in `KAGI_API_KEY`. (Signing in with your Kagi account instead is only available over HTTP, such as with the [hosted server](#sign-in-with-your-kagi-account-oauth).)
 - [`uv`](https://docs.astral.sh/uv/) for the recommended `uvx` install path.
 
 Install `uv`:
@@ -131,9 +176,7 @@ Environment variable | Description
 `KAGI_MAX_RETRIES` | Max retry attempts after the first request. Defaults to `2`; set `0` to disable retries.
 `KAGI_HIDDEN_PARAMS` | Comma-separated search params to hide from the LLM-facing schema.
 `KAGI_SEARCH_FORMAT` | Search result format: `json` (default) or `markdown` (the Search API's own markdown, passed through as-is).
-`KAGI_MCP_PUBLIC_URL` | Public base URL of this MCP server for OAuth discovery; defaults to `https://mcp.kagi.com`.
-`KAGI_OAUTH_ISSUER` | Advertised authorization server issuer; defaults to `https://account.kagi.com`.
-`KAGI_OAUTH_METADATA_URL` | OIDC metadata for Authorization; defaults to `https://account.kagi.com/.well-known/openid-configuration`.
+`KAGI_MCP_PUBLIC_URL` | Public base URL of this MCP server, used for OAuth discovery in HTTP mode. Defaults to `https://mcp.kagi.com`; set it to your own URL when [self-hosting](#self-hosting).
 
 Hideable search params:
 
@@ -175,6 +218,11 @@ instance can serve multiple users. The repo ships a `Dockerfile` that installs a
 runs it in HTTP mode. The container respects `$PORT` so it works on any
 platform that injects one (Railway, Render, Cloud Run, Fly.io, etc.).
 
+To let users sign in with their Kagi account, set `KAGI_MCP_PUBLIC_URL` to the
+public base URL your server is reachable at (for example
+`https://mcp.example.com`). Clients use it to discover where to sign in; left at
+its default, it points them at Kagi's hosted server instead of yours.
+
 Build and run locally:
 
 ```sh
@@ -191,18 +239,6 @@ curl -sL http://127.0.0.1:8000/mcp -X POST \
   -H "accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
-
-To bump the version in production, edit the pin in the `Dockerfile` and redeploy.
-
-### OAuth token renewal
-
-For OAuth-enabled deployments, the server advertises `offline_access` in its
-protected-resource metadata so clients that use discovery to select scopes can
-request refresh tokens. Zitadel requires this scope to issue refresh tokens in
-the authorization code flow; see its [standard scopes documentation](https://zitadel.com/docs/apis/openidoauth/scopes#standard-scopes).
-The client stores and uses refresh tokens to obtain new access tokens through
-the [refresh token grant](https://zitadel.com/docs/apis/openidoauth/endpoints#refresh-token-grant).
-Token renewal is handled by the client, not the MCP server.
 
 ## Debugging
 
